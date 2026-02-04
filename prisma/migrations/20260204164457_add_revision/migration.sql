@@ -1,0 +1,9 @@
+-- CreateTable
+CREATE TABLE "WikiRevision" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "content" TEXT NOT NULL,
+    "comment" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "pageId" INTEGER NOT NULL,
+    CONSTRAINT "WikiRevision_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "WikiPage" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);

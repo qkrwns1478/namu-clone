@@ -1,0 +1,45 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model WikiPage {
+  id        Int            @id @default(autoincrement())
+  slug      String         @unique
+  content   String         // 현재 보여질 최신 내용 (캐싱용)
+  updatedAt DateTime       @updatedAt
+  revisions WikiRevision[] // 1:N 관계 (역사)
+  categories CategoryOnPage[]
+}
+
+model Category {
+  id    Int              @id @default(autoincrement())
+  name  String           @unique // 예: "IT", "요리"
+  pages CategoryOnPage[]
+}
+
+model CategoryOnPage {
+  page       WikiPage @relation(fields: [pageId], references: [id])
+  pageId     Int
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId Int
+
+  @@id([pageId, categoryId]) // 복합 키
+}
+
+model WikiRevision {
+  id         Int      @id @default(autoincrement())
+  content    String   // 당시의 내용
+  comment    String?  // 수정 코멘트 (예: 오타 수정)
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  
+  page       WikiPage @relation(fields: [pageId], references: [id])
+  pageId     Int
+}
