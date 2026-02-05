@@ -29,7 +29,7 @@ export default function ImageUploader() {
         <div className="mt-2 text-sm">
           <p>삽입 코드:</p>
           <code className="bg-yellow-100 p-1 block mt-1 select-all">
-            {'{{{' + uploadedName + '}}}'}
+            {'[[파일:' + uploadedName + ']]'}
           </code>
         </div>
       )}

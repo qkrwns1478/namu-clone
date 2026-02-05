@@ -4,8 +4,9 @@ import { PrismaClient } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { writeFile } from 'fs/promises'
-import { join } from 'path'
+import { writeFile, access } from 'fs/promises'
+import { join, parse } from 'path'
+import { constants } from 'fs'
 
 const prisma = new PrismaClient()
 
@@ -172,13 +173,31 @@ export async function uploadImage(formData: FormData) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // 파일명 충돌 방지를 위해 시간값 추가
-    const filename = `${Date.now()}_${file.name.replace(/\s/g, '_')}`
-    const path = join(process.cwd(), 'public/uploads', filename)
+    // 1. 기본 파일명 정리 (공백 -> 언더바)
+    let filename = file.name.replace(/\s/g, '_')
+    const uploadDir = join(process.cwd(), 'public/uploads')
+    let savePath = join(uploadDir, filename)
 
-    await writeFile(path, buffer)
-    
-    // 성공 시 파일명 반환
+    // 2. 파일명 중복 체크 및 이름 변경 로직
+    const { name: stem, ext } = parse(filename)
+    let counter = 1
+
+    while (true) {
+      try {
+        await access(savePath, constants.F_OK)
+        
+        // 파일이 존재하므로 이름 변경 (예: image_1.png)
+        filename = `${stem}_${counter}${ext}`
+        savePath = join(uploadDir, filename)
+        counter++
+      } catch (error) {
+        break
+      }
+    }
+
+    // 3. 파일 저장
+    await writeFile(savePath, buffer)
+
     return { success: true, filename }
   } catch (error) {
     console.error(error)
