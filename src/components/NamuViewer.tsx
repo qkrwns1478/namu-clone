@@ -244,8 +244,176 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
   let keyCounter = 0;
   const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
 
-  // 4. 인라인 파서
-  const parseInline = (text: string): React.ReactNode[] => {
+  // =================================================================================
+  // [CORE PARSERS]
+  // =================================================================================
+
+  // [Helper] Brace Depth를 고려하여 "||" 로 셀을 분리하는 함수
+  function splitCells(text: string): string[] {
+    const res: string[] = [];
+    let buf = "";
+    let depth = 0;
+    
+    for (let i = 0; i < text.length; i++) {
+        if (text.startsWith("{{{", i)) {
+            depth++;
+            buf += "{{{";
+            i += 2;
+        } else if (text.startsWith("}}}", i)) {
+            depth--;
+            buf += "}}}";
+            i += 2;
+        } else if (depth === 0 && text.startsWith("||", i)) {
+            // 깊이가 0일 때만 구분자로 인식
+            // 맨 앞의 ||, 맨 뒤의 ||도 이 로직을 타서 빈 문자열로 들어갈 수 있으므로
+            // parseTable에서 빈 셀 처리를 함.
+            res.push(buf);
+            buf = "";
+            i++; // ||는 2글자이므로 i를 하나 더 증가 (루프에서 i++ 되므로 총 +2)
+        } else {
+            buf += text[i];
+        }
+    }
+    res.push(buf);
+    return res;
+  }
+
+  // [Sub Block Renderer]
+  function renderSubBlock(subLines: string[]) {
+    const nodes: React.ReactNode[] = [];
+    let j = 0;
+    while (j < subLines.length) {
+      const l = subLines[j].replace(/\r$/, "").trim();
+
+      // --- [Wiki 블록 재귀 처리] ---
+      if (l.startsWith("{{{#!wiki")) {
+        const styleMatch = l.match(/style="([^"]*)"/);
+        const styleString = styleMatch ? styleMatch[1] : "";
+        const customStyle = parseCssStyle(styleString);
+        let currentLineContent = l.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
+
+        const contentLines: string[] = [];
+        let depth = 3;
+        let k = j;
+        let foundEnd = false;
+
+        while (k < subLines.length) {
+            let textToAnalyze = subLines[k];
+            if (k === j) textToAnalyze = currentLineContent;
+
+            const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
+            const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
+
+            depth += openMatches * 3;
+            depth -= closeMatches * 3;
+
+            if (depth <= 0) {
+                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+                if (contentToAdd.trim() || k !== j) {
+                    if (contentToAdd.trim()) contentLines.push(contentToAdd);
+                }
+                j = k + 1;
+                foundEnd = true;
+                break;
+            }
+
+            if (k === j) {
+                if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
+            } else {
+                contentLines.push(textToAnalyze);
+            }
+            k++;
+        }
+
+        if (foundEnd) {
+            nodes.push(
+                <div key={getKey("wiki-block-sub")} style={customStyle} className="wiki-block">
+                    {renderSubBlock(contentLines)}
+                </div>
+            );
+            continue;
+        }
+      }
+
+      // --- [Folding 블록 재귀 처리] ---
+      if (l.startsWith("{{{#!folding")) {
+        const title = l.replace("{{{#!folding", "").trim();
+        const contentLines: string[] = [];
+        let depth = 3; 
+        let k = j + 1;
+        let foundEnd = false;
+
+        while (k < subLines.length) {
+            const currentLine = subLines[k];
+            const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
+            const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
+            depth += (openMatches * 3);
+            depth -= (closeMatches * 3);
+
+            if (depth <= 0) {
+                const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, ""); 
+                if (cleanedLine.trim()) contentLines.push(cleanedLine);
+                j = k + 1;
+                foundEnd = true;
+                break;
+            }
+            contentLines.push(currentLine);
+            k++;
+        }
+
+        if (foundEnd) {
+            nodes.push(
+                <Folding key={getKey("folding-sub")} title={title}>
+                    {renderSubBlock(contentLines)}
+                </Folding>
+            );
+            continue;
+        }
+      }
+
+      // --- [Table 블록 처리] ---
+      // renderSubBlock 내에서도 멀티라인 테이블 인식을 위해 로직 보강
+      if (l.startsWith("||")) {
+         // 여기서 다시 parseTable을 호출하지만,
+         // parseTable은 lines 배열을 받으므로, 여기서 테이블에 해당하는 줄들을 모아줘야 함.
+         const tLines = [];
+         let m = j;
+         let tableDepth = 0;
+
+         while (m < subLines.length) {
+             const line = subLines[m];
+             // 테이블 시작 혹은 진행 중
+             // 간단하게는 ||로 시작하면 테이블이지만, 
+             // 멀티라인 셀이 있으면 ||로 시작 안 할 수도 있음.
+             // 따라서 Main Loop와 동일한 수집 로직이 필요함.
+             
+             const open = (line.match(/\{\{\{/g) || []).length;
+             const close = (line.match(/\}\}\}/g) || []).length;
+             tableDepth += (open - close);
+
+             tLines.push(line);
+             m++;
+
+             if (tableDepth <= 0) {
+                 // 깊이가 0인데 다음 줄이 ||로 시작 안 하면 테이블 종료
+                 if (m < subLines.length && !subLines[m].trim().startsWith("||")) {
+                     break;
+                 }
+             }
+         }
+         
+         nodes.push(parseTable(tLines));
+         j = m;
+      } else {
+        nodes.push(parseLine(subLines[j], -1));
+        j++;
+      }
+    }
+    return nodes;
+  }
+
+  // [Inline Parser]
+  function parseInline(text: string): React.ReactNode[] {
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
 
@@ -318,10 +486,8 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           const rawContent = text.slice(candidate.idx + 3, endIdx);
           const after = text.slice(endIdx + 3);
 
-          // [FIX] 테이블 내 인라인 Folding 처리
           if (rawContent.startsWith("#!folding")) {
             const parts = rawContent.replace("#!folding", "").trim();
-            // 보통 {{{#!folding [제목] 내용... }}} 형식
             let title = "more";
             let foldingContent = parts;
 
@@ -331,26 +497,29 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
                 foldingContent = parts.substring(titleMatch[0].length).trim();
             }
 
+            const contentLines = foldingContent.split("\n");
+
             return [
                 ...parseInline(before),
                 <Folding key={getKey("folding-inline")} title={title}>
-                    {parseInline(foldingContent)}
+                    {renderSubBlock(contentLines)}
                 </Folding>,
                 ...parseInline(after)
             ];
           }
 
-           // [FIX] 테이블 내 인라인 Wiki Style 처리
            if (rawContent.startsWith("#!wiki")) {
             const styleMatch = rawContent.match(/style="([^"]*)"/);
             const styleString = styleMatch ? styleMatch[1] : "";
             const customStyle = parseCssStyle(styleString);
             const innerContent = rawContent.replace(/^#!wiki(\s+style="[^"]*")?/, "").trim();
 
+            const contentLines = innerContent.split("\n");
+
             return [
                 ...parseInline(before),
                 <div key={getKey("wiki-inline")} style={customStyle} className="inline-block">
-                    {parseInline(innerContent)}
+                    {renderSubBlock(contentLines)}
                 </div>,
                 ...parseInline(after)
             ];
@@ -566,17 +735,17 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     }
 
     return [text];
-  };
+  }
 
-  const parseColorValue = (val: string) => {
+  function parseColorValue(val: string) {
     if (!val) return "";
     if (val.includes(",")) {
       return val.split(",")[0].trim();
     }
     return val.trim();
-  };
+  }
 
-  const parseCellAttributes = (rawContent: string) => {
+  function parseCellAttributes(rawContent: string) {
     let content = rawContent;
 
     let style: React.CSSProperties = {};
@@ -760,14 +929,48 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     content = content.trim();
 
     return { style, tableStyle, rowStyle, colStyle, colSpan, rowSpan, content };
-  };
+  }
 
-  const parseTable = (lines: string[]) => {
-    const rows = lines.map((line) => {
+  function parseTable(lines: string[]) {
+    // [FIX] 줄 병합 로직 (Multi-line Cell 지원)
+    // 괄호가 열려있다면 다음 줄도 같은 행으로 취급하여 병합
+    const mergedRows: string[] = [];
+    let currentBuffer = "";
+    let braceDepth = 0;
+
+    for (const line of lines) {
+        const open = (line.match(/\{\{\{/g) || []).length;
+        const close = (line.match(/\}\}\}/g) || []).length;
+        
+        if (braceDepth === 0 && currentBuffer === "") {
+             currentBuffer = line;
+             braceDepth += (open - close);
+        } else {
+             // 줄바꿈을 유지하며 병합
+             currentBuffer += "\n" + line;
+             braceDepth += (open - close);
+        }
+
+        if (braceDepth <= 0) {
+             mergedRows.push(currentBuffer);
+             currentBuffer = "";
+             braceDepth = 0;
+        }
+    }
+    if (currentBuffer) mergedRows.push(currentBuffer);
+
+    const rows = mergedRows.map((line) => {
       const trimmed = line.trim();
-      const rawCells = trimmed.split("||");
+      
+      // [FIX] splitCells 함수 사용: 괄호 깊이를 고려하여 || 분리
+      // 기존: const rawCells = trimmed.split("||"); -> 내부 블록의 ||까지 잘라버림
+      const rawCells = splitCells(trimmed);
+
       const cells = [];
       for (let i = 0; i < rawCells.length; i++) {
+        // Namuwiki 테이블은 보통 시작과 끝에 ||가 있어서, split 결과의 첫/끝이 빈 문자열일 수 있음
+        // 단, splitCells는 정확히 구분자 사이의 텍스트만 가져오므로
+        // "|| a || b ||" -> ["", " a ", " b ", ""]
         if (i === 0 && rawCells[i] === "" && trimmed.startsWith("||")) continue;
         if (i === rawCells.length - 1 && rawCells[i].trim() === "" && trimmed.endsWith("||")) continue;
         cells.push(parseCellAttributes(rawCells[i]));
@@ -874,9 +1077,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         </table>
       </div>
     );
-  };
+  }
 
-  const parseLine = (rawLine: string, lineIndex: number) => {
+  function parseLine(rawLine: string, lineIndex: number) {
     const line = rawLine.replace(/\r$/, "").trim();
 
     if (line === "[목차]") {
@@ -984,119 +1187,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         {parseInline(line)}
       </div>
     );
-  };
+  }
 
-  const renderSubBlock = (subLines: string[]) => {
-    const nodes: React.ReactNode[] = [];
-    let j = 0;
-    while (j < subLines.length) {
-      const l = subLines[j].replace(/\r$/, "").trim();
-
-      // [FIX] Folding/Wiki 중첩 지원을 위해 renderSubBlock 내에서도 블록 파싱 로직 추가
-
-      // --- [Wiki 블록 재귀 처리] ---
-      if (l.startsWith("{{{#!wiki")) {
-        const styleMatch = l.match(/style="([^"]*)"/);
-        const styleString = styleMatch ? styleMatch[1] : "";
-        const customStyle = parseCssStyle(styleString);
-        let currentLineContent = l.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
-
-        const contentLines: string[] = [];
-        let depth = 3;
-        let k = j;
-        let foundEnd = false;
-
-        while (k < subLines.length) {
-            let textToAnalyze = subLines[k];
-            if (k === j) textToAnalyze = currentLineContent;
-
-            const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
-            const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
-
-            depth += openMatches * 3;
-            depth -= closeMatches * 3;
-
-            if (depth <= 0) {
-                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
-                if (contentToAdd.trim() || k !== j) {
-                    if (contentToAdd.trim()) contentLines.push(contentToAdd);
-                }
-                j = k + 1;
-                foundEnd = true;
-                break;
-            }
-
-            if (k === j) {
-                if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
-            } else {
-                contentLines.push(textToAnalyze);
-            }
-            k++;
-        }
-
-        if (foundEnd) {
-            nodes.push(
-                <div key={getKey("wiki-block-sub")} style={customStyle} className="wiki-block">
-                    {renderSubBlock(contentLines)}
-                </div>
-            );
-            continue;
-        }
-      }
-
-      // --- [Folding 블록 재귀 처리] ---
-      if (l.startsWith("{{{#!folding")) {
-        const title = l.replace("{{{#!folding", "").trim();
-        const contentLines: string[] = [];
-        let depth = 3; 
-        let k = j + 1;
-        let foundEnd = false;
-
-        while (k < subLines.length) {
-            const currentLine = subLines[k];
-            const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
-            const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
-            depth += (openMatches * 3);
-            depth -= (closeMatches * 3);
-
-            if (depth <= 0) {
-                const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, ""); 
-                if (cleanedLine.trim()) contentLines.push(cleanedLine);
-                j = k + 1;
-                foundEnd = true;
-                break;
-            }
-            contentLines.push(currentLine);
-            k++;
-        }
-
-        if (foundEnd) {
-            nodes.push(
-                <Folding key={getKey("folding-sub")} title={title}>
-                    {renderSubBlock(contentLines)}
-                </Folding>
-            );
-            continue;
-        }
-      }
-
-      // --- [Table 블록 처리] ---
-      if (l.startsWith("||")) {
-        const tLines = [];
-        let m = j;
-        while (m < subLines.length && subLines[m].trim().startsWith("||")) {
-          tLines.push(subLines[m]);
-          m++;
-        }
-        nodes.push(parseTable(tLines));
-        j = m;
-      } else {
-        nodes.push(parseLine(subLines[j], -1));
-        j++;
-      }
-    }
-    return nodes;
-  };
+  // =================================================================================
 
   const renderedContent: React.ReactNode[] = [];
   let i = 0;
@@ -1119,14 +1212,13 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       let currentLineContent = line.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
 
       const contentLines: string[] = [];
-      let depth = 3; // 시작 태그({{{)가 이미 depth 3을 차지함
+      let depth = 3; 
       let k = i;
       let foundEnd = false;
 
       while (k < lines.length) {
         let textToAnalyze = lines[k];
 
-        // 첫 줄인 경우, 앞의 태그가 제거된 텍스트로 분석
         if (k === i) {
           textToAnalyze = currentLineContent;
         }
@@ -1134,7 +1226,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
         const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
 
-        // 첫 줄은 이미 depth=3으로 시작했으므로, 추가적인 {{{ 만 더함
         depth += openMatches * 3;
         depth -= closeMatches * 3;
 
@@ -1210,14 +1301,25 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     if (line.startsWith("||")) {
       const tableLines = [];
       let j = i;
+      let tableDepth = 0;
 
       while (j < lines.length) {
-        const nextLine = lines[j].replace(/\r$/, "").trim();
-        if (nextLine.startsWith("||")) {
-          tableLines.push(lines[j]);
-          j++;
-        } else {
-          break;
+        const curr = lines[j];
+        
+        // [FIX] Depth 체크 로직 추가: 
+        // 테이블 내부 셀에 {{{ ... }}} 가 열려있으면 줄이 ||로 시작 안 해도 테이블의 일부로 간주
+        const open = (curr.match(/\{\{\{/g) || []).length;
+        const close = (curr.match(/\}\}\}/g) || []).length;
+        tableDepth += (open - close);
+
+        tableLines.push(curr);
+        j++;
+
+        // Depth가 0 이하로 떨어졌을 때만 '다음 줄이 테이블이 아니면 종료' 판단
+        if (tableDepth <= 0) {
+            if (j < lines.length && !lines[j].trim().startsWith("||")) {
+                break;
+            }
         }
       }
 
