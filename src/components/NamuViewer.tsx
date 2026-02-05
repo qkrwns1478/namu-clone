@@ -1,12 +1,61 @@
+'use client'
+
 import Link from 'next/link'
-import React from 'react'
+import React, { useState, useMemo } from 'react'
+import { ChevronDown, ChevronLeft } from 'lucide-react'
+
+// 목차 아이템 타입
+type TocItem = {
+  id: string;
+  text: string;
+  level: number;
+  numberStr: string;
+}
 
 export default function NamuViewer({ content }: { content: string }) {
+  const [isTocExpanded, setIsTocExpanded] = useState(true);
+
+  // 1. [목차 생성] 렌더링 전 전체 스캔
+  const { tocItems, headerMap } = useMemo(() => {
+    const items: TocItem[] = [];
+    const hMap: { [key: number]: string } = {}; 
+    const counters = [0, 0, 0, 0, 0, 0]; 
+
+    const lines = content.split('\n');
+    lines.forEach((rawLine, lineIndex) => {
+      const line = rawLine.replace(/\r$/, '').trim();
+      const headerMatch = line.match(/^(=+)\s*(.+?)\s*\1$/);
+      
+      if (headerMatch) {
+        const level = headerMatch[1].length;
+        const text = headerMatch[2];
+
+        if (level >= 2) { // == (h2) 부터 번호 매김
+          const counterIndex = level - 2;
+          counters[counterIndex]++;
+          for (let i = counterIndex + 1; i < counters.length; i++) counters[i] = 0;
+
+          const numberParts = [];
+          for (let i = 0; i <= counterIndex; i++) numberParts.push(counters[i]);
+          
+          const numberStr = numberParts.join('.') + '.';
+          const id = `s-${numberStr.slice(0, -1)}`; 
+
+          items.push({ id, text, level, numberStr });
+          hMap[lineIndex] = numberStr; 
+        }
+      }
+    });
+    return { tocItems: items, headerMap: hMap };
+  }, [content]);
+
+  // 2. [각주 저장소] 렌더링 시마다 초기화
   const footnotes: React.ReactNode[] = [];
   
   let keyCounter = 0;
   const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
 
+  // 3. 인라인 파서
   const parseInline = (text: string): React.ReactNode[] => {
     // [각주]
     const noteRegex = /\[\*(.*?)\]/;
@@ -15,25 +64,19 @@ export default function NamuViewer({ content }: { content: string }) {
       const before = text.slice(0, noteMatch.index);
       const noteContent = noteMatch[1];
       const after = text.slice(noteMatch.index + noteMatch[0].length);
-
+      
+      // 각주 내용 저장 (재귀 파싱)
       footnotes.push(
         <span key={getKey('fn-content')}>
             {parseInline(noteContent)}
         </span>
       );
-      
       const noteId = footnotes.length;
 
       return [
         ...parseInline(before),
         <sup key={getKey('fn-ref')} id={`r${noteId}`}>
-          <a 
-            href={`#fn${noteId}`} 
-            className="text-[#0275d8] font-bold mx-0.5 cursor-pointer" 
-            title={noteContent}
-          >
-            [{noteId}]
-          </a>
+          <a href={`#fn${noteId}`} className="text-[#0275d8] font-bold mx-0.5 cursor-pointer" title="각주">{`[${noteId}]`}</a>
         </sup>,
         ...parseInline(after)
       ];
@@ -48,7 +91,7 @@ export default function NamuViewer({ content }: { content: string }) {
       const after = text.slice(imgMatch.index + imgMatch[0].length);
       return [
         ...parseInline(before), 
-        <div key={getKey('img')} className="my-2 inline-block"><img src={`/uploads/${filename}`} alt={filename} className="max-w-full h-auto rounded border" /></div>, 
+        <div key={getKey('img')} className="my-2 inline-block"><img src={`/uploads/${filename}`} alt={filename} className="max-w-full h-auto" /></div>, 
         ...parseInline(after)
       ];
     }
@@ -91,11 +134,87 @@ export default function NamuViewer({ content }: { content: string }) {
     return [text];
   };
 
-  const parseLine = (rawLine: string) => {
-    const line = rawLine.replace(/\r$/, '');
-    
+  // 4. 라인 파서
+  const parseLine = (rawLine: string, lineIndex: number) => {
+    const line = rawLine.replace(/\r$/, '').trim();
+
+    // [헤더]
+    const headerMatch = line.match(/^(=+)\s*(.+?)\s*\1$/);
+    if (headerMatch) {
+      const level = headerMatch[1].length; 
+      const text = headerMatch[2];
+      
+      const sizes: { [key: number]: string } = {
+        1: "text-3xl mt-6 mb-4 border-b-2 pb-2",
+        2: "text-2xl mt-5 mb-3 border-b pb-1 font-bold",
+        3: "text-xl mt-4 mb-2 font-bold",
+        4: "text-lg mt-3 mb-1 font-bold",
+        5: "text-base mt-2 font-bold",
+        6: "text-sm mt-2 font-bold"
+      };
+
+      const numberStr = headerMap[lineIndex]; // 미리 계산된 번호 (예: 2.1.)
+      const id = numberStr ? `s-${numberStr.slice(0, -1)}` : undefined;
+
+      const headerContent = (
+        <span className="flex items-center w-full">
+          {numberStr && <a href={`#${id}`} className="mr-2 text-[#0275d8] hover:!underline"><span>{numberStr}</span></a>}
+          <span>{text}</span>
+          <span className="ml-auto text-[#0275d8] text-xs cursor-pointer font-normal select-none hover:underline">[편집]</span>
+        </span>
+      );
+
+      const headerElement = React.createElement(
+        `h${level}`,
+        { 
+          key: getKey('header'), 
+          id: id,
+          className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center group scroll-mt-[60px]`
+        },
+        headerContent
+      );
+
+      // 첫 번째 헤더 위에 목차 삽입
+      const isFirstTocHeader = tocItems.length > 0 && tocItems[0].numberStr === numberStr;
+      
+      if (isFirstTocHeader) {
+        return (
+          <React.Fragment key={getKey('toc-fragment')}>
+            {/* 목차 박스 */}
+            <div className="px-5 py-3 mb-6 border border-[#ccc] bg-white inline-block min-w-[120px] max-w-full">
+              <div 
+                className="flex justify-between items-center cursor-pointer select-none"
+                onClick={() => setIsTocExpanded(!isTocExpanded)}
+              >
+                <span className="text-lg">목차</span>
+                <span className="text-gray-500 text-xs font-normal">{isTocExpanded ? <ChevronDown size={20} /> : <ChevronLeft size={20} />}</span>
+              </div>
+              
+              {isTocExpanded && (
+                <div className="mt-3 leading-6">
+                  {tocItems.map((item) => (
+                    <div className="flex" key={item.id} style={{ paddingLeft: `${(item.level - 2) * 15}px` }}>
+                      <a href={`#${item.id}`} className="mr-1 text-[#0275d8] hover:!underline block truncate">
+                        <span>{item.numberStr}</span>
+                      </a>
+                      <span className='text-[#373a3c]'>
+                        {item.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {headerElement}
+          </React.Fragment>
+        );
+      }
+
+      return headerElement;
+    }
+
     // [리스트]
-    const listMatch = line.match(/^(\s*)\*\s*(.*)$/);
+    const listMatch = rawLine.replace(/\r$/, '').match(/^(\s*)\*\s*(.*)$/); // rawLine 사용 (들여쓰기 유지)
     if (listMatch) {
       const indentLevel = listMatch[1].length; 
       const content = listMatch[2]; 
@@ -108,45 +227,16 @@ export default function NamuViewer({ content }: { content: string }) {
       );
     }
 
-    const trimmed = line.trim();
+    if (!line) return <br key={getKey('br')} />;
 
-    if (!trimmed) return <br key={getKey('br')} />;
+    if (line.startsWith('[[분류:') && line.endsWith(']]')) return null;
 
-    // [분류 숨김]
-    if (trimmed.startsWith('[[분류:') && trimmed.endsWith(']]')) return null;
+    if (line.match(/^-{4,}$/)) return <hr key={getKey('hr')} className="my-4 border-gray-300" />;
 
-    // [헤더]
-    const headerMatch = trimmed.match(/^(=+)\s*(.+?)\s*\1$/);
-    if (headerMatch) {
-      const level = headerMatch[1].length; 
-      const text = headerMatch[2];
-      const sizes: { [key: number]: string } = {
-        1: "text-3xl mt-6 mb-4 border-b-2 pb-2",
-        2: "text-2xl font-bold mt-5 mb-3 border-b pb-1",
-        3: "text-xl mt-4 mb-2 font-bold",
-        4: "text-lg mt-3 mb-1 font-bold",
-        5: "text-base mt-2 font-bold",
-        6: "text-sm mt-2 font-bold"
-      };
-      return React.createElement(
-        `h${level}`,
-        { 
-          key: getKey('header'), 
-          className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center group w-full` 
-        },
-        text,
-        <span className="ml-auto text-[#0275d8] text-xs cursor-pointer font-normal select-none">[편집]</span>
-      );
-    }
-
-    // [가로줄]
-    if (trimmed.match(/^-{4,}$/)) return <hr key={getKey('hr')} className="my-4 border-gray-300" />;
-
-    // [인용문]
-    if (trimmed.startsWith('>')) {
+    if (line.startsWith('>')) {
         return (
             <blockquote key={getKey('quote')} className="border-l-4 border-[#00A495] pl-4 py-1 my-2 bg-gray-50 text-gray-600">
-                {parseInline(trimmed.slice(1).trim())}
+                {parseInline(line.slice(1).trim())}
             </blockquote>
         )
     }
@@ -158,9 +248,10 @@ export default function NamuViewer({ content }: { content: string }) {
     );
   };
 
+  // 5. 최종 렌더링
   const parsedContent = content.split('\n').map((line, i) => (
     <React.Fragment key={i}>
-      {parseLine(line)}
+      {parseLine(line, i)}
     </React.Fragment>
   ));
 
