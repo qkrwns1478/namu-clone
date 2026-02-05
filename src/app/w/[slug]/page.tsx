@@ -76,7 +76,9 @@ export default async function WikiPage({ params }: Props) {
       {/* 상단 툴바 */}
       <div className="flex justify-between">
         <div className="mb-4">
-          <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">{page.slug}</h1>
+          <a href={`/w/${page.slug}`} className="hover:!underline" >
+            <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">{page.slug}</h1>
+          </a>
           <div className="text-sm text-[#212529BF] mt-2">
             최근 수정 시각: {page.updatedAt.toLocaleString()}
           </div>

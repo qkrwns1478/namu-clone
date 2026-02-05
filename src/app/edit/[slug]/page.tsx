@@ -1,5 +1,4 @@
 import { getWikiPage, saveWikiPage } from "@/app/actions";
-import ImageUploader from "@/components/ImageUploader";
 import Link from "next/link";
 import { FaAnchor } from "react-icons/fa";
 import { FaCircleArrowRight, FaTrashCan } from "react-icons/fa6";
@@ -14,7 +13,9 @@ export default async function EditPage({ params }: { params: Promise<{ slug: str
     <div className="p-5 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       {/* 상단 헤더 및 버튼 그룹 */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
-        <h1 className="text-3xl font-bold text-[#373a3c]">{decodedSlug}</h1>
+        <a href={`/w/${decodedSlug}`} className="hover:!underline" >
+          <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">{decodedSlug}</h1>
+        </a>
 
         <div className="flex">
           {/* 역링크 */}

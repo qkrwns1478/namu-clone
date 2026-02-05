@@ -12,7 +12,7 @@ export default function RootLayout({
       <body>
         <Header />
         
-        <div className="max-w-[1300px] mx-auto px-2 sm:px-4 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 mt-4">
+        <div className="max-w-[1300px] mx-auto min-h-[calc(100vh-193px)] px-2 sm:px-4 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 mt-4">
           {/* 메인 콘텐츠 영역 */}
           <main className="min-w-0">
             {children}
