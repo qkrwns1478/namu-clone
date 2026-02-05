@@ -137,6 +137,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
   // 4. 인라인 파서
   const parseInline = (text: string): React.ReactNode[] => {
+    // [각주 파싱]
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
     if (noteMatch) {
@@ -160,7 +161,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       ];
     }
 
-    const imgRegex = /\{\{\{(.*?)\}\}\}/;
+    /* const imgRegex = /\{\{\{(.*?)\}\}\}/;
     const imgMatch = imgRegex.exec(text);
     if (imgMatch) {
       const before = text.slice(0, imgMatch.index);
@@ -168,13 +169,50 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const after = text.slice(imgMatch.index + imgMatch[0].length);
       return [
         ...parseInline(before),
-        <div key={getKey("img")} className="my-2 inline-block">
+        <div key={getKey("img-old")} className="my-2 inline-block">
           <img src={`/uploads/${filename}`} alt={filename} className="max-w-full h-auto" />
+        </div>,
+        ...parseInline(after),
+      ];
+    } */
+
+    // [이미지 파싱]
+    const fileRegex = /\[\[(?:파일|File):(.+?)(?:\|(.*?))?\]\]/;
+    const fileMatch = fileRegex.exec(text);
+    if (fileMatch) {
+      const before = text.slice(0, fileMatch.index);
+      const filename = fileMatch[1];
+      const optionsRaw = fileMatch[2] || ""; // 파이프 뒤의 옵션들
+      const after = text.slice(fileMatch.index + fileMatch[0].length);
+
+      // 옵션 파싱 (현재 width만 간단히 처리)
+      const options = optionsRaw.split('|');
+      let width: string | undefined = undefined;
+      
+      options.forEach(opt => {
+        const trimmed = opt.trim();
+        if (trimmed.startsWith('width=')) {
+          const val = trimmed.split('=')[1];
+          // 숫자로만 되어있으면 px 붙임
+          width = /^\d+$/.test(val) ? `${val}px` : val;
+        }
+      });
+
+      return [
+        ...parseInline(before),
+        <div key={getKey("file-new")} className="my-2 inline-block">
+          <img 
+            src={`/uploads/${filename}`} 
+            alt={filename} 
+            style={{ width: width }}
+            className="max-w-full h-auto" 
+          />
         </div>,
         ...parseInline(after),
       ];
     }
 
+    // [볼드체 파싱]
     const boldRegex = /'''(.*?)'''/;
     const boldMatch = boldRegex.exec(text);
     if (boldMatch) {
@@ -184,6 +222,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       return [...parseInline(before), <b key={getKey("bold")}>{inner}</b>, ...parseInline(after)];
     }
 
+    // [취소선 파싱]
     const delRegex = /~~(.*?)~~/;
     const delMatch = delRegex.exec(text);
     if (delMatch) {
@@ -199,6 +238,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       ];
     }
 
+    // [링크 파싱]
     const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/;
     const linkMatch = linkRegex.exec(text);
     if (linkMatch) {
