@@ -292,3 +292,17 @@ export async function deleteWikiPage(formData: FormData) {
 
   redirect('/')
 }
+
+// 링크된 문서들의 존재 여부 확인
+export async function getExistingSlugs(slugs: string[]) {
+  if (!slugs || slugs.length === 0) return []
+  
+  const pages = await prisma.wikiPage.findMany({
+    where: {
+      slug: { in: slugs }
+    },
+    select: { slug: true }
+  })
+  
+  return pages.map(p => p.slug)
+}

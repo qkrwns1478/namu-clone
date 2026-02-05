@@ -12,9 +12,12 @@ type TocItem = {
   numberStr: string;
 }
 
-export default function NamuViewer({ content }: { content: string }) {
+export default function NamuViewer({ content, existingSlugs = [] }: { content: string, existingSlugs?: string[] }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set()); 
+
+  // 빠른 조회를 위해 Set으로 변환
+  const existingSet = useMemo(() => new Set(existingSlugs), [existingSlugs]);
 
   // 섹션 토글 함수
   const toggleSection = (id: string) => {
@@ -169,9 +172,22 @@ export default function NamuViewer({ content }: { content: string }) {
       const target = linkMatch[1];
       const label = linkMatch[2] || target;
       const after = text.slice(linkMatch.index + linkMatch[0].length);
+
+      // 앵커 제거 후 문서 존재 여부 확인
+      const targetSlug = target.includes('#') ? target.split('#')[0] : target;
+      const isExist = existingSet.has(targetSlug);
+      // 존재하지 않으면 빨간색(#FF0000), 존재하면 파란색(#0275d8)
+      const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
+
       return [
         ...parseInline(before),
-        <Link key={getKey('link')} href={`/w/${encodeURIComponent(target)}`} className="text-[#0275d8] hover:!underline">{label}</Link>,
+        <Link 
+          key={getKey('link')} 
+          href={`/w/${encodeURIComponent(target)}`} 
+          className={`${linkColor} hover:!underline`}
+        >
+          {label}
+        </Link>,
         ...parseInline(after)
       ];
     }
@@ -203,21 +219,18 @@ export default function NamuViewer({ content }: { content: string }) {
       const isCollapsed = id ? collapsedSections.has(id) : false;
 
       const headerContent = (
-        // [수정] 제목 전체 영역 클릭 시 토글 (cursor-pointer 추가, onClick 이동)
         <span 
           className="flex items-center w-full group cursor-pointer"
           onClick={() => {
             if (id) toggleSection(id);
           }}
         >
-          {/* 화살표 아이콘 (클릭 이벤트 제거 -> 부모 이벤트 따름) */}
           {id && (
             <span className="text-[#666] mr-2 text-xs font-normal">
               {isCollapsed ? <ChevronRight /> : <ChevronDown />}
             </span>
           )}
           
-          {/* 섹션 번호 (클릭 시 토글 방지, 링크 기능만 수행) */}
           {numberStr && (
             <a 
               href={`#${id}`} 
@@ -228,10 +241,8 @@ export default function NamuViewer({ content }: { content: string }) {
             </a>
           )}
           
-          {/* 제목 텍스트 */}
           <span>{text}</span>
           
-          {/* 우측 편집 버튼 (클릭 시 토글 방지) */}
           <div 
             className="ml-auto flex gap-2 select-none"
             onClick={(e) => e.stopPropagation()}
@@ -246,7 +257,6 @@ export default function NamuViewer({ content }: { content: string }) {
         { 
           key: getKey('header'), 
           id: id,
-          // 접혔을 때 opacity-50 적용
           className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center scroll-mt-[60px] ${isCollapsed ? 'opacity-50' : ''}`
         },
         headerContent

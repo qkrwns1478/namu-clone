@@ -1,4 +1,4 @@
-import { getWikiPage, getCategoryDocs } from "@/app/actions";
+import { getWikiPage, getCategoryDocs, getExistingSlugs } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
@@ -104,11 +104,34 @@ export default async function WikiPage({ params }: Props) {
     );
   }
 
+  // 본문 내 링크 파싱하여 존재 여부 확인
+  let existingSlugs: string[] = [];
+  if (page) {
+    const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
+    const targets = new Set<string>();
+    let match;
+    
+    // 본문을 스캔하여 링크 대상 추출
+    while ((match = linkRegex.exec(page.content)) !== null) {
+      let target = match[1];
+      // 앵커(#)가 있는 경우 앞부분(문서명)만 추출
+      if (target.includes('#')) {
+        target = target.split('#')[0];
+      }
+      if (target) targets.add(target);
+    }
+    
+    // DB에서 존재 여부 조회
+    if (targets.size > 0) {
+      existingSlugs = await getExistingSlugs(Array.from(targets));
+    }
+  }
+
   const encodedSlug = encodeURIComponent(page.slug);
   const colonIndex = page.slug.indexOf(":");
 
   return (
-    <div className="p-5 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
+    <div className="p-6 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       {/* 상단 툴바 */}
       <div className="flex justify-between">
         <div className="mb-4">
@@ -170,7 +193,7 @@ export default async function WikiPage({ params }: Props) {
 
       {/* 본문 뷰어 */}
       <div className="min-h-[300px]">
-        <NamuViewer content={page.content} />
+        <NamuViewer content={page.content} existingSlugs={existingSlugs} />
 
         {isCategoryPage && (
           <div className="mt-8">
