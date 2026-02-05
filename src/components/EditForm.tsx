@@ -45,14 +45,14 @@ export default function EditForm({
       <input type="hidden" name="slug" value={slug} />
 
       {/* 탭 버튼 */}
-      <div className="flex border-b border-[#ccc] mb-0 select-none">
+      <div className="flex mb-1 select-none">
         <button
           type="button"
           onClick={() => handleTabChange('edit')}
-          className={`px-4 py-2 text-sm font-bold border border-b-0 rounded-t-sm -mb-[1px] ${
+          className={`px-4 py-2 text-sm border border-b-0 rounded-t-sm -mb-[1px] cursor-pointer ${
             activeTab === 'edit'
-              ? 'text-[#373a3c] border-[#ccc] bg-white'
-              : 'text-[#0275d8] border-transparent bg-transparent hover:underline font-normal'
+              ? 'text-[#55595C] border-[#ccc]'
+              : 'text-[#000000] border-transparent'
           }`}
         >
           RAW 편집
@@ -60,10 +60,10 @@ export default function EditForm({
         <button
           type="button"
           onClick={() => handleTabChange('preview')}
-          className={`px-4 py-2 text-sm font-bold border border-b-0 rounded-t-sm -mb-[1px] ${
+          className={`px-4 py-2 text-sm border border-b-0 rounded-t-sm -mb-[1px] cursor-pointer ${
             activeTab === 'preview'
-              ? 'text-[#373a3c] border-[#ccc] bg-white'
-              : 'text-[#0275d8] border-transparent bg-transparent hover:underline font-normal'
+              ? 'text-[#55595C] border-[#ccc]'
+              : 'text-[#000000] border-transparent'
           }`}
         >
           미리보기
@@ -76,14 +76,14 @@ export default function EditForm({
           name="content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="w-full h-[60vh] p-4 border border-[#ccc] border-t-0 rounded-b-sm focus:outline-none focus:ring-2 focus:ring-[#00A495] inset-ring font-mono text-[14px] leading-relaxed resize-y"
+          className="w-full h-[60vh] p-4 border border-[#ccc] rounded-b-sm focus:outline-none font-mono text-[14px] leading-relaxed resize-y"
           placeholder="여기에 내용을 입력하세요..."
         />
       </div>
 
       {/* 미리보기 영역 */}
       {activeTab === 'preview' && (
-        <div className="w-full min-h-[60vh] p-5 border border-[#ccc] border-t-0 rounded-b-sm bg-white overflow-y-auto">
+        <div className="w-full h-[60vh] p-4 border border-[#ccc] rounded-b-sm bg-white overflow-y-auto">
           <NamuViewer content={content} existingSlugs={previewLinks} /> 
         </div>
       )}
