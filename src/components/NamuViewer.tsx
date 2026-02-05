@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState, useMemo } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 // 목차 아이템 타입
 type TocItem = {
@@ -12,14 +13,75 @@ type TocItem = {
   numberStr: string;
 };
 
+// 각주 툴팁 컴포넌트
+const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const ref = useRef<HTMLElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleMouseEnter = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setCoords({
+        top: rect.top,
+        left: rect.left + rect.width / 2,
+      });
+      setIsHovered(true);
+    }
+  };
+
+  return (
+    <>
+      <sup
+        ref={ref}
+        className="relative"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <a
+          id={`r${id}`}
+          href={`#fn${id}`}
+          className="text-[#0275d8] hover:!underline font-bold mx-0.5 cursor-pointer text-xs"
+        >
+          [{id}]
+        </a>
+      </sup>
+
+      {mounted && isHovered && createPortal(
+        <div
+          className="fixed z-[9999] p-2 bg-white border border-[#ccc] rounded text-sm text-gray-700 font-normal leading-normal whitespace-normal break-words text-left"
+          style={{
+            top: coords.top - 8,
+            left: coords.left,
+            width: "max-content",
+            maxWidth: "300px",
+            transform: "translate(-50%, -100%)", 
+            pointerEvents: "none",
+          }}
+        >
+          <span className="text-[#0275d8]">[{id}]</span>
+          {content}
+          <div 
+            className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-[6px] border-t-[#ccc]"
+          ></div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
 export default function NamuViewer({ content, existingSlugs = [] }: { content: string; existingSlugs?: string[] }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  // 빠른 조회를 위해 Set으로 변환
   const existingSet = useMemo(() => new Set(existingSlugs), [existingSlugs]);
 
-  // 섹션 토글 함수
   const toggleSection = (id: string) => {
     setCollapsedSections((prev) => {
       const newSet = new Set(prev);
@@ -32,7 +94,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     });
   };
 
-  // 1. [목차 및 헤더 정보 생성] (기존과 동일)
+  // 1. [목차 및 헤더 정보 생성]
   const { tocItems, headerMap } = useMemo(() => {
     const items: TocItem[] = [];
     const hMap: { [lineIndex: number]: string } = {};
@@ -68,7 +130,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     return { tocItems: items, headerMap: hMap };
   }, [content]);
 
-  // 목차 렌더링 (기존과 동일)
+  // 목차 렌더링
   const renderToc = () => (
     <div className="px-5 py-3 border border-[#ccc] bg-white inline-block min-w-[120px] max-w-full">
       <div
@@ -96,7 +158,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     </div>
   );
 
-  // 2. [가시성 계산] (기존과 동일)
+  // 2. [가시성 계산]
   const lines = content.split("\n");
   const visibilityMap = new Array(lines.length).fill(true);
   let currentHideLevel = 0;
@@ -130,42 +192,37 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
   let keyCounter = 0;
   const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
 
-  // 4. 인라인 파서 (핵심 수정 부분)
+  // 4. 인라인 파서
   const parseInline = (text: string): React.ReactNode[] => {
     // [각주 파싱]
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
     if (noteMatch) {
       const before = text.slice(0, noteMatch.index);
-      const noteContent = noteMatch[1];
+      const noteContentRaw = noteMatch[1];
       const after = text.slice(noteMatch.index + noteMatch[0].length);
 
-      footnotes.push(<span key={getKey("fn-content")}>{parseInline(noteContent)}</span>);
+      const parsedNoteContent = parseInline(noteContentRaw);
+      
+      footnotes.push(<span key={getKey("fn-content")}>{parsedNoteContent}</span>);
       const noteId = footnotes.length;
 
       return [
         ...parseInline(before),
-        <sup key={getKey("fn-ref")} id={`r${noteId}`}>
-          <a
-            href={`#fn${noteId}`}
-            className="text-[#0275d8] hover:!underline font-bold mx-0.5 cursor-pointer"
-          >{`[${noteId}]`}</a>
-        </sup>,
+        <FootnoteRef key={getKey("fn-ref")} id={noteId} content={parsedNoteContent} />,
         ...parseInline(after),
       ];
     }
 
-    // [통합 위키 문법 파서: 파일, 내부링크, 외부링크]
-    // 중첩된 대괄호 [[ ... [[ ... ]] ... ]] 를 한 단계까지 허용하는 정규식
+    // [통합 위키 문법]
     const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
     const match = wikiRegex.exec(text);
 
     if (match) {
       const before = text.slice(0, match.index);
-      const rawContent = match[1]; // 대괄호 안의 내용 (예: "Link|Label" 또는 "파일:Img.png|width=100")
+      const rawContent = match[1];
       const after = text.slice(match.index + match[0].length);
 
-      // 파이프(|)로 Target과 Label 분리 (중첩된 대괄호 안의 파이프는 무시해야 함)
       let splitIndex = -1;
       let depth = 0;
       for (let i = 0; i < rawContent.length; i++) {
@@ -180,11 +237,8 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const target = splitIndex !== -1 ? rawContent.slice(0, splitIndex) : rawContent;
       const optionsRaw = splitIndex !== -1 ? rawContent.slice(splitIndex + 1) : "";
 
-      // 4-A. [파일 처리]
       if (/^(파일|File|이미지):/i.test(target)) {
         const filename = target.split(":")[1];
-        
-        // 옵션 파싱 (width 등)
         const options = optionsRaw.split("|");
         let width: string | undefined = undefined;
         options.forEach((opt) => {
@@ -209,14 +263,10 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         ];
       }
 
-      // 4-B. [링크 처리 (내부/외부)]
       const isExternal = /^https?:\/\//i.test(target);
-      
-      // 라벨이 있으면 라벨을 재귀적으로 파싱 (이미지 중첩 가능), 없으면 타겟 텍스트 표시
       const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target];
 
       if (isExternal) {
-        // [외부 링크]
         return [
           ...parseInline(before),
           <a
@@ -231,7 +281,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           ...parseInline(after),
         ];
       } else {
-        // [내부 링크]
         const targetSlug = target.includes("#") ? target.split("#")[0] : target;
         const isExist = existingSet.has(targetSlug);
         const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
@@ -250,7 +299,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       }
     }
 
-    // [볼드체]
     const boldRegex = /'''(.*?)'''/;
     const boldMatch = boldRegex.exec(text);
     if (boldMatch) {
@@ -260,7 +308,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       return [...parseInline(before), <b key={getKey("bold")}>{inner}</b>, ...parseInline(after)];
     }
 
-    // [취소선]
     const delRegex = /~~(.*?)~~/;
     const delMatch = delRegex.exec(text);
     if (delMatch) {
@@ -279,7 +326,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     return [text];
   };
 
-  // 5. 라인 파서 (기존과 동일하지만 이미지/링크 로직은 parseInline에 위임)
   const parseLine = (rawLine: string, lineIndex: number) => {
     const line = rawLine.replace(/\r$/, "").trim();
 
@@ -291,7 +337,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       );
     }
 
-    // [헤더]
     const headerMatch = line.match(/^(=+)\s*(.+?)\s*\1$/);
     if (headerMatch) {
       const level = headerMatch[1].length;
@@ -343,7 +388,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       );
     }
 
-    // [리스트]
     const listMatch = rawLine.replace(/\r$/, "").match(/^(\s*)\*\s*(.*)$/);
     if (listMatch) {
       const indentLevel = listMatch[1].length;
