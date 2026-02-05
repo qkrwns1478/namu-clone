@@ -53,26 +53,26 @@ const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) 
         </a>
       </sup>
 
-      {mounted && isHovered && createPortal(
-        <div
-          className="fixed z-[9999] p-2 bg-white border border-[#ccc] rounded text-sm text-gray-700 font-normal leading-normal whitespace-normal break-words text-left"
-          style={{
-            top: coords.top - 8,
-            left: coords.left,
-            width: "max-content",
-            maxWidth: "300px",
-            transform: "translate(-50%, -100%)", 
-            pointerEvents: "none",
-          }}
-        >
-          <span className="text-[#0275d8]">[{id}]</span>
-          {content}
-          <div 
-            className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-[6px] border-t-[#ccc]"
-          ></div>
-        </div>,
-        document.body
-      )}
+      {mounted &&
+        isHovered &&
+        createPortal(
+          <div
+            className="fixed z-[9999] p-2 bg-white border border-[#ccc] rounded text-sm text-gray-700 font-normal leading-normal whitespace-normal break-words text-left"
+            style={{
+              top: coords.top - 8,
+              left: coords.left,
+              width: "max-content",
+              maxWidth: "300px",
+              transform: "translate(-50%, -100%)",
+              pointerEvents: "none",
+            }}
+          >
+            <span className="text-[#0275d8]">[{id}]</span>
+            {content}
+            <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-[6px] border-t-[#ccc]"></div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 };
@@ -204,7 +204,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const after = text.slice(noteMatch.index + noteMatch[0].length);
 
       const parsedNoteContent = parseInline(noteContentRaw);
-      
+
       footnotes.push(<span key={getKey("fn-content")}>{parsedNoteContent}</span>);
       const noteId = footnotes.length;
 
@@ -280,7 +280,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             className="text-[#090] hover:!underline inline-flex items-center gap-1"
           >
             {!hasImageInLabel && (
-              <span className="inline-flex items-center justify-center bg-[#008000] text-white p-[2px] text-[14.4px] shrink-0">
+              <span className="inline-flex items-center justify-center bg-[#008000] text-white p-[2px] text-[15px] shrink-0">
                 <IoLink size={12} />
               </span>
             )}
@@ -334,6 +334,288 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     return [text];
   };
 
+  // --- [Helper] 색상 값 파싱 (쉼표 지원) ---
+  const parseColorValue = (val: string) => {
+    if (!val) return "";
+    // (라이트, 다크) -> 라이트 모드만 지원
+    if (val.includes(",")) {
+      return val.split(",")[0].trim();
+    }
+    return val.trim();
+  };
+
+  // --- [5. 파서 로직] ---
+  const parseCellAttributes = (rawContent: string) => {
+    // 1. 태그 파싱
+    let content = rawContent;
+
+    let style: React.CSSProperties = {};
+    let tableStyle: React.CSSProperties = {};
+    let rowStyle: React.CSSProperties = {};
+    let colStyle: React.CSSProperties = {};
+    let colSpan = 1;
+    let rowSpan = 1;
+
+    // 반복문으로 맨 앞의 태그 추출
+    while (true) {
+      const trimmedCheck = content.trimStart();
+      if (!trimmedCheck.startsWith("<")) break;
+
+      const endIdx = trimmedCheck.indexOf(">");
+      if (endIdx === -1) break;
+
+      const tagContent = trimmedCheck.slice(1, endIdx);
+      const lowerInner = tagContent.toLowerCase().trim();
+      let handled = false;
+
+      // [1] tablebordercolor
+      if (lowerInner.startsWith("tablebordercolor=")) {
+        const v = parseColorValue(tagContent.split("=")[1]);
+        tableStyle.border = `2px solid ${v}`;
+        handled = true;
+      }
+      // [2] tablealign (표 정렬)
+      else if (lowerInner.startsWith("tablealign=")) {
+        const v = lowerInner.split("=")[1];
+        if (v === "right") {
+          tableStyle.float = "right";
+          tableStyle.marginLeft = "10px";
+        } else if (v === "left") {
+          tableStyle.float = "left";
+          tableStyle.marginRight = "10px";
+        } else if (v === "center") {
+          tableStyle.marginLeft = "auto";
+          tableStyle.marginRight = "auto";
+          tableStyle.float = "none";
+        }
+        handled = true;
+      }
+      // [3] 테이블 전체 속성 (<table ...>) - 일반적인 table 태그
+      else if (lowerInner.startsWith("table")) {
+        const optsStr = tagContent.substring(5).trim();
+        const opts = optsStr.split(/\s+/);
+        opts.forEach((opt) => {
+          const parts = opt.split("=");
+          if (parts.length === 2) {
+            const k = parts[0].toLowerCase();
+            const v = parseColorValue(parts[1]);
+
+            if (k === "bordercolor") {
+              tableStyle.borderColor = v;
+            } else if (k === "bgcolor") tableStyle.backgroundColor = v;
+            else if (k === "width") tableStyle.width = v;
+            else if (k === "align") {
+              if (v === "right") {
+                tableStyle.float = "right";
+                tableStyle.marginLeft = "10px";
+              } else if (v === "left") {
+                tableStyle.float = "left";
+                tableStyle.marginRight = "10px";
+              } else if (v === "center") {
+                tableStyle.marginLeft = "auto";
+                tableStyle.marginRight = "auto";
+              }
+            }
+          }
+        });
+        handled = true;
+      }
+      // [4] 행 속성
+      else if (lowerInner.startsWith("rowbgcolor=")) {
+        rowStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
+        handled = true;
+      } else if (lowerInner.startsWith("rowcolor=")) {
+        rowStyle.color = parseColorValue(tagContent.split("=")[1]);
+        handled = true;
+      }
+      // [5] 열 속성
+      else if (lowerInner.startsWith("colbgcolor=")) {
+        colStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
+        handled = true;
+      } else if (lowerInner.startsWith("colcolor=")) {
+        colStyle.color = parseColorValue(tagContent.split("=")[1]);
+        handled = true;
+      }
+      // [6] 셀 여백 제거 (nopad)
+      else if (lowerInner === "nopad") {
+        style.padding = "0px";
+        handled = true;
+      }
+      // [7] 셀 배경색
+      else if (lowerInner.startsWith("bgcolor=")) {
+        style.backgroundColor = parseColorValue(tagContent.split("=")[1]);
+        handled = true;
+      } else if (tagContent.startsWith("#")) {
+        style.backgroundColor = parseColorValue(tagContent);
+        handled = true;
+      }
+      // [8] 셀 글자색
+      else if (lowerInner.startsWith("color=")) {
+        style.color = parseColorValue(tagContent.split("=")[1]);
+        handled = true;
+      }
+      // [9] 텍스트 정렬 (명시적 태그)
+      else if (tagContent === "(") {
+        style.textAlign = "left";
+        handled = true;
+      } else if (tagContent === ":") {
+        style.textAlign = "center";
+        handled = true;
+      } else if (tagContent === ")") {
+        style.textAlign = "right";
+        handled = true;
+      }
+      // [10] 병합
+      else if (tagContent.startsWith("-")) {
+        const val = parseInt(tagContent.slice(1));
+        if (!isNaN(val)) {
+          colSpan = val;
+          handled = true;
+        }
+      } else if (tagContent.startsWith("|")) {
+        const val = parseInt(tagContent.slice(1));
+        if (!isNaN(val)) {
+          rowSpan = val;
+          handled = true;
+        }
+      }
+      // [11] 너비/높이
+      else if (lowerInner.startsWith("width=")) {
+        const val = tagContent.split("=")[1];
+        style.width = /^\d+$/.test(val) ? `${val}px` : val;
+        handled = true;
+      } else if (lowerInner.startsWith("height=")) {
+        const val = tagContent.split("=")[1];
+        style.height = /^\d+$/.test(val) ? `${val}px` : val;
+        handled = true;
+      }
+
+      if (handled) {
+        const realTagIndex = content.indexOf("<" + tagContent + ">");
+        if (realTagIndex !== -1) {
+          content = content.slice(realTagIndex + tagContent.length + 2);
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    // 2. 공백 기반 정렬 감지
+    if (!style.textAlign) {
+      if (content.startsWith(" ") && content.endsWith(" ")) {
+        style.textAlign = "center";
+      } else if (content.startsWith(" ") && !content.endsWith(" ")) {
+        style.textAlign = "right";
+      } else if (!content.startsWith(" ") && content.endsWith(" ")) {
+        style.textAlign = "left";
+      }
+    }
+
+    content = content.trim();
+
+    return { style, tableStyle, rowStyle, colStyle, colSpan, rowSpan, content };
+  };
+
+  // --- [6. 테이블 파서] ---
+  const parseTable = (lines: string[]) => {
+    // 1. 셀 데이터 파싱 (기존과 동일)
+    const rows = lines.map((line) => {
+      const trimmed = line.trim();
+      const rawCells = trimmed.split("||");
+      const cells = [];
+      for (let i = 0; i < rawCells.length; i++) {
+        if (i === 0 && rawCells[i] === "" && trimmed.startsWith("||")) continue;
+        if (i === rawCells.length - 1 && rawCells[i].trim() === "" && trimmed.endsWith("||")) continue;
+        cells.push(parseCellAttributes(rawCells[i]));
+      }
+      return cells;
+    });
+
+    let containerStyle: React.CSSProperties = {
+      borderCollapse: "collapse",
+      border: "1px solid #ccc",
+      fontSize: "14px",
+      width: "auto",
+      maxWidth: "100%",
+      display: "table",
+      marginBottom: "10px",
+    };
+
+    const colStyles: React.CSSProperties[] = [];
+    let maxCols = 0;
+
+    if (rows.length > 0) {
+      rows.forEach((r) => maxCols = Math.max(maxCols, r.length));
+
+      // colStyle 수집 (colcolor 지원)
+      rows.forEach((cells) => {
+        cells.forEach((cell, cIdx) => {
+          if (Object.keys(cell.colStyle).length > 0) {
+            colStyles[cIdx] = { ...(colStyles[cIdx] || {}), ...cell.colStyle };
+          }
+        });
+      });
+
+      // 첫 행 첫 셀의 스타일을 테이블 전체 스타일로 병합
+      if (rows[0].length > 0) {
+        const first = rows[0][0];
+        if (first.tableStyle && Object.keys(first.tableStyle).length > 0) {
+          containerStyle = { ...containerStyle, ...first.tableStyle };
+        }
+      }
+    }
+
+    return (
+      <div className="overflow-x-auto my-4 w-full block" key={getKey("table-wrap")}>
+        <table className="text-gray-800" style={containerStyle}>
+          {maxCols > 0 && (
+            <colgroup>
+              {Array.from({ length: maxCols }).map((_, i) => (
+                <col key={i} style={colStyles[i] || {}} />
+              ))}
+            </colgroup>
+          )}
+
+          <tbody>
+            {rows.map((cells, rIdx) => {
+              let trStyle: React.CSSProperties = {};
+              const rowStyleCell = cells.find((c) => Object.keys(c.rowStyle).length > 0);
+              if (rowStyleCell) trStyle = rowStyleCell.rowStyle;
+
+              return (
+                <tr key={getKey(`tr-${rIdx}`)} style={trStyle}>
+                  {cells.map((cell, cIdx) => {
+                    const currentValColStyle = colStyles[cIdx] || {};
+                    return (
+                      <td
+                        key={getKey(`td-${rIdx}-${cIdx}`)}
+                        className="border px-2 py-1 align-middle break-words"
+                        style={{
+                          borderColor: containerStyle.borderColor || "#ccc",
+                          // 스타일 우선순위: 열 < 행 < 셀
+                          ...currentValColStyle,
+                          ...trStyle,
+                          ...cell.style,
+                        }}
+                        colSpan={cell.colSpan}
+                        rowSpan={cell.rowSpan}
+                      >
+                        {parseInline(cell.content)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="clear-both"></div>
+      </div>
+    );
+  };
+
   const parseLine = (rawLine: string, lineIndex: number) => {
     const line = rawLine.replace(/\r$/, "").trim();
 
@@ -374,13 +656,19 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             </span>
           )}
           {numberStr && (
-            <a href={`#${id}`} className="mr-2 text-[#0275d8] hover:!underline" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={`#${id}`}
+              className="mr-2 text-[#0275d8] hover:!underline"
+              onClick={(e) => e.stopPropagation()}
+            >
               <span>{numberStr}</span>
             </a>
           )}
           <span>{text}</span>
           <div className="ml-auto flex gap-2 select-none" onClick={(e) => e.stopPropagation()}>
-            <span className="text-[#0275d8] text-xs cursor-pointer font-normal hover:!underline">[편집]</span>
+            <span className="text-[#0275d8] text-xs cursor-pointer font-normal hover:!underline">
+              [편집]
+            </span>
           </div>
         </span>
       );
@@ -434,14 +722,45 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     );
   };
 
-  const parsedContent = lines.map((line, i) => {
-    if (!visibilityMap[i]) return null;
-    return <React.Fragment key={i}>{parseLine(line, i)}</React.Fragment>;
-  });
+  const renderedContent: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (!visibilityMap[i]) {
+      i++;
+      continue;
+    }
+
+    const line = lines[i].replace(/\r$/, "").trim();
+
+    if (line.startsWith("||")) {
+      const tableLines = [];
+      let j = i;
+
+      while (j < lines.length) {
+        const nextLine = lines[j].replace(/\r$/, "").trim();
+        if (nextLine.startsWith("||")) {
+          tableLines.push(lines[j]);
+          j++;
+        } else {
+          break;
+        }
+      }
+
+      if (tableLines.length > 0) {
+        renderedContent.push(parseTable(tableLines));
+        i = j;
+        continue;
+      }
+    }
+
+    renderedContent.push(<React.Fragment key={i}>{parseLine(lines[i], i)}</React.Fragment>);
+    i++;
+  }
 
   return (
     <div>
-      <div className="prose max-w-none text-gray-800 text-[15px]">{parsedContent}</div>
+      <div className="prose max-w-none text-gray-800 text-[15px]">{renderedContent}</div>
 
       {footnotes.length > 0 && (
         <div className="border-t mt-5 mb-5 pt-4 border-[#777]">
