@@ -105,6 +105,31 @@ const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) 
   );
 };
 
+  // CSS 스타일 문자열을 React Style 객체로 변환하는 헬퍼 함수
+  const parseCssStyle = (styleString: string): React.CSSProperties => {
+    const style: any = {};
+    const rules = styleString.split(";");
+
+    rules.forEach((rule) => {
+      const parts = rule.split(":");
+      if (parts.length < 2) return;
+
+      // 속성명은 camelCase로 변환 (예: background-color -> backgroundColor)
+      const key = parts[0]
+        .trim()
+        .replace(/-(\w)/g, (_, c) => c.toUpperCase());
+      
+      // 값에 :이 포함될 수 있으므로(url 등) 나머지 부분을 합침
+      const value = parts.slice(1).join(":").trim();
+
+      if (key && value) {
+        style[key] = value;
+      }
+    });
+
+    return style;
+  };
+
 export default function NamuViewer({ content, existingSlugs = [] }: { content: string; existingSlugs?: string[] }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -979,6 +1004,72 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     }
 
     const line = lines[i].replace(/\r$/, "").trim();
+
+    if (line.startsWith("{{{#!wiki")) {
+      // 1. 스타일 추출
+      const styleMatch = line.match(/style="([^"]*)"/);
+      const styleString = styleMatch ? styleMatch[1] : "";
+      const customStyle = parseCssStyle(styleString);
+
+      // 2. 시작 태그 제거 후 남은 텍스트 확인
+      // 예: {{{#!wiki style="..." 내용 시작 -> " 내용 시작"
+      let currentLineContent = line.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
+
+      const contentLines: string[] = [];
+      let depth = 3; // 시작 태그({{{)가 이미 depth 3을 차지함
+      let k = i;
+      let foundEnd = false;
+
+      while (k < lines.length) {
+        let textToAnalyze = lines[k];
+
+        // 첫 줄인 경우, 앞의 태그가 제거된 텍스트로 분석
+        if (k === i) {
+          textToAnalyze = currentLineContent;
+        }
+
+        const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
+        const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
+
+        // 첫 줄은 이미 depth=3으로 시작했으므로, 추가적인 {{{ 만 더함
+        // 이후 줄은 {{{ 개수만큼 depth 추가
+        depth += openMatches * 3;
+        depth -= closeMatches * 3;
+
+        if (depth <= 0) {
+          // 닫는 태그 발견
+          // 마지막 }}} 하나를 제거 (가장 뒤에 있는 것)
+          let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+          
+          if (contentToAdd.trim() || k !== i) {
+            // 빈 줄이 아니거나, 여러 줄에 걸친 내용의 마지막 줄일 경우 추가
+            if (contentToAdd.trim()) contentLines.push(contentToAdd);
+          }
+          
+          i = k + 1;
+          foundEnd = true;
+          break;
+        }
+
+        // 닫는 태그가 이 줄에 없으면 통째로 추가
+        if (k === i) {
+          if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
+        } else {
+          contentLines.push(textToAnalyze);
+        }
+        
+        k++;
+      }
+
+      if (foundEnd) {
+        renderedContent.push(
+          <div key={getKey("wiki-block")} style={customStyle} className="wiki-block">
+            {renderSubBlock(contentLines)}
+          </div>
+        );
+        continue;
+      }
+    }
 
     // [접기/펼치기 파서]
     if (line.startsWith("{{{#!folding")) {
