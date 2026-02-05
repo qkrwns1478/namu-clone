@@ -462,7 +462,15 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           ...parseInline(after),
         ];
       } else {
-        const targetSlug = target.includes("#") ? target.split("#")[0] : target;
+        const hashIndex = target.indexOf("#");
+        let targetSlug = target;
+        let anchor = "";
+
+        if (hashIndex !== -1) {
+          targetSlug = target.substring(0, hashIndex);
+          anchor = target.substring(hashIndex);
+        }
+
         const isExist = existingSet.has(targetSlug);
         const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
 
@@ -470,7 +478,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           ...parseInline(before),
           <Link
             key={getKey("int-link")}
-            href={`/w/${encodeURIComponent(target)}`}
+            href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
             className={`${linkColor} hover:!underline`}
           >
             {labelNodes}
