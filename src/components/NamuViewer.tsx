@@ -215,6 +215,42 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       ];
     }
 
+    // 텍스트 크기 {{{+1 ...}}} / {{{-1 ...}}}
+    const sizeRegex = /\{\{\{([+-])([1-5])\s*(.*?)\}\}\}/;
+    const sizeMatch = sizeRegex.exec(text);
+
+    if (sizeMatch) {
+      const before = text.slice(0, sizeMatch.index);
+      const sign = sizeMatch[1]; // + 또는 -
+      const level = sizeMatch[2]; // 1 ~ 5
+      const innerContent = sizeMatch[3]; // 내부 텍스트
+      const after = text.slice(sizeMatch.index + sizeMatch[0].length);
+
+      // 요청하신 사이즈 매핑 테이블
+      const sizeMapping: { [key: string]: string } = {
+        "+1": "1.28889em",
+        "+2": "1.38889em",
+        "+3": "1.48144em",
+        "+4": "1.57400em",
+        "+5": "1.66667em",
+        "-1": "0.92589em",
+        "-2": "0.83333em",
+        "-3": "0.74067em",
+        "-4": "0.64811em",
+        "-5": "0.62222em",
+      };
+
+      const targetSize = sizeMapping[`${sign}${level}`] || "1em";
+
+      return [
+        ...parseInline(before),
+        <span key={getKey("size")} style={{ fontSize: targetSize }}>
+          {parseInline(innerContent)}
+        </span>,
+        ...parseInline(after),
+      ];
+    }
+
     // [통합 위키 문법]
     const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
     const match = wikiRegex.exec(text);
