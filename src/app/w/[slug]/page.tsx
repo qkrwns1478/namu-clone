@@ -28,6 +28,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+const CHO_SUNG = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+
+function getInitial(char: string) {
+  const code = char.charCodeAt(0);
+  // 한글 유니코드 범위: 0xAC00(가) ~ 0xD7A3(힣)
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    const initialOffset = Math.floor((code - 0xac00) / 28 / 21);
+    return CHO_SUNG[initialOffset];
+  }
+  // 한글 자음만 있는 경우 (ㄱ, ㄴ...)
+  if (code >= 0x3131 && code <= 0x314e) {
+    return char;
+  }
+  // 영문이나 숫자는 그대로 대문자로 반환하거나 기타 처리
+  if (/[a-zA-Z]/.test(char)) return char.toUpperCase();
+  if (/[0-9]/.test(char)) return char; // 숫자는 숫자 그대로 그룹화 or '0-9'로 묶기
+
+  return "기타";
+}
+
 export default async function WikiPage({ params }: Props) {
   const { slug } = await params;
   const decodedSlug = decodeURIComponent(slug);
@@ -41,18 +61,33 @@ export default async function WikiPage({ params }: Props) {
 
   const linkedCategories = page?.categories?.map((c) => c.category.name) || [];
 
+  // 분류 문서 그룹화 로직
+  const groupedDocs: { [key: string]: typeof categoryDocs } = {};
+
+  if (isCategoryPage && categoryDocs.length > 0) {
+    categoryDocs.sort((a, b) => a.page.slug.localeCompare(b.page.slug));
+    categoryDocs.forEach((doc) => {
+      const initial = getInitial(doc.page.slug.charAt(0));
+      if (!groupedDocs[initial]) {
+        groupedDocs[initial] = [];
+      }
+      groupedDocs[initial].push(doc);
+    });
+  }
+
+  // 그룹 키 정렬 (ㄱ -> ㅎ -> A -> Z -> 기타)
+  const sortedKeys = Object.keys(groupedDocs).sort((a, b) => a.localeCompare(b, "ko"));
+
   // 스타일 클래스
   const btnToolClass =
     "p-1 border border-[#ccc] rounded text-gray-600 hover:bg-gray-100 transition-colors bg-white flex items-center justify-center w-[32px] h-[32px]";
-  const btnToolTextClass =
-    "flex items-center gap-1 px-3 py-1.5 border border-[#ccc] rounded text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors bg-white h-[32px]";
 
-  const btnToolLeftClass =
-    "p-1 border border-r-0 border-[#ccc] rounded rounded-r-none text-[#212529BF] hover:bg-gray-100 transition-colors bg-white flex items-center justify-center w-[32px] h-[32px]";
   const btnToolMiddleClass =
     "flex items-center gap-1 px-3 py-1 border border-r-0 border-[#ccc] rounded rounded-l-none rounded-r-none text-sm text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
   const btnToolRightClass =
     "flex items-center gap-1 px-3 py-1 border border-[#ccc] rounded rounded-l-none text-sm text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
+  const btnToolLeftClass =
+    "p-1 border border-r-0 border-[#ccc] rounded rounded-r-none text-[#212529BF] hover:bg-gray-100 transition-colors bg-white flex items-center justify-center w-[32px] h-[32px]";
 
   if (!page) {
     return (
@@ -70,14 +105,26 @@ export default async function WikiPage({ params }: Props) {
   }
 
   const encodedSlug = encodeURIComponent(page.slug);
+  const colonIndex = page.slug.indexOf(":");
 
   return (
     <div className="p-5 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       {/* 상단 툴바 */}
       <div className="flex justify-between">
         <div className="mb-4">
-          <a href={`/w/${page.slug}`} className="hover:!underline" >
-            <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">{page.slug}</h1>
+          <a href={`/w/${page.slug}`} className="hover:!underline">
+            <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">
+              {colonIndex !== -1 ? (
+                <>
+                  <span style={{ boxShadow: "inset 0 -0.5rem 0 #d4f0e3" }}>
+                    {page.slug.substring(0, colonIndex)}
+                  </span>
+                  {page.slug.substring(colonIndex)}
+                </>
+              ) : (
+                page.slug
+              )}
+            </h1>
           </a>
           <div className="text-sm text-[#212529BF] mt-2">
             최근 수정 시각: {page.updatedAt.toLocaleString()}
@@ -108,9 +155,7 @@ export default async function WikiPage({ params }: Props) {
       {/* 분류 상자 */}
       {linkedCategories.length > 0 && (
         <div className="mb-[14px] px-2 py-1 rounded border border-[#e5e7eb] bg-white text-sm flex flex-wrap items-center gap-2">
-          <span className="text-gray-500 text-xs">
-            분류:
-          </span>
+          <span className="text-gray-500 text-xs">분류:</span>
           {linkedCategories.map((cat) => (
             <Link
               key={cat}
@@ -125,30 +170,44 @@ export default async function WikiPage({ params }: Props) {
 
       {/* 본문 뷰어 */}
       <div className="min-h-[300px]">
+        <NamuViewer content={page.content} />
+
         {isCategoryPage && (
-          <div className="mb-8 bg-[#f5f5f5] border border-gray-300 rounded-sm">
-            <h3 className="font-bold text-lg mb-3 text-gray-700 border-b border-gray-300 pb-2">
-              '{categoryName}' 분류에 속한 문서
-            </h3>
+          <div className="mt-8">
+            <h2 className="font-bold text-2xl mb-1 text-[#373a3c] mb-6 pb-2 border-b border-[#ccc]">"{categoryName}" 분류에 속하는 문서</h2>
+            <div className="text-sm text-gray-500">
+              전체 {categoryDocs.length}개 문서
+            </div>
+
             {categoryDocs.length === 0 ? (
               <p className="text-sm text-gray-500 p-2">이 분류에 속한 문서가 없습니다.</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
-                {categoryDocs.map((doc) => (
-                  <Link
-                    key={doc.page.slug}
-                    href={`/w/${encodeURIComponent(doc.page.slug)}`}
-                    className="text-[#0275d8] hover:underline block truncate text-[15px]"
-                  >
-                    {doc.page.slug}
-                  </Link>
+              <div className="columns-1 sm:columns-2 lg:columns-3 gap-8 space-y-8">
+                {sortedKeys.map((key) => (
+                  <div key={key} className="break-inside-avoid-column mb-6">
+                    {/* 초성 헤더 */}
+                    <h3 className="font-bold text-xl mb-2 text-[#373a3c] border-b border-gray-300 pb-1">
+                      {key}
+                    </h3>
+                    {/* 문서 리스트 */}
+                    <ul className="list-disc list-inside space-y-1">
+                      {groupedDocs[key].map((doc) => (
+                        <li key={doc.page.slug} className="text-[15px]">
+                          <Link
+                            href={`/w/${encodeURIComponent(doc.page.slug)}`}
+                            className="text-[#0275d8] hover:underline"
+                          >
+                            {doc.page.slug}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
               </div>
             )}
           </div>
         )}
-
-        <NamuViewer content={page.content} />
       </div>
     </div>
   );
