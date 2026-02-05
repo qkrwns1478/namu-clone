@@ -83,9 +83,9 @@ export default async function WikiPage({ params }: Props) {
     "p-1 border border-[#ccc] rounded text-gray-600 hover:bg-gray-100 transition-colors bg-white flex items-center justify-center w-[32px] h-[32px]";
 
   const btnToolMiddleClass =
-    "flex items-center gap-1 px-3 py-1 border border-r-0 border-[#ccc] rounded rounded-l-none rounded-r-none text-sm text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
+    "flex items-center gap-1 px-3 py-1 border border-r-0 border-[#ccc] rounded rounded-l-none rounded-r-none text-[15px] text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
   const btnToolRightClass =
-    "flex items-center gap-1 px-3 py-1 border border-[#ccc] rounded rounded-l-none text-sm text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
+    "flex items-center gap-1 px-3 py-1 border border-[#ccc] rounded rounded-l-none text-[15px] text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
   const btnToolLeftClass =
     "p-1 border border-r-0 border-[#ccc] rounded rounded-r-none text-[#212529BF] hover:bg-gray-100 transition-colors bg-white flex items-center justify-center w-[32px] h-[32px]";
 
@@ -157,20 +157,20 @@ export default async function WikiPage({ params }: Props) {
         <div className="flex justify-end gap-2 flex-wrap">
           <div className="flex">
             <button className={btnToolLeftClass} title="북마크">
-              <Star size={16} />
+              <Star size={15} />
             </button>
             <Link href={`/edit/${encodedSlug}`} className={btnToolMiddleClass}>
-              <FaEdit size={14} /> 편집
+              <FaEdit size={15} /> 편집
             </Link>
             <Link href="#" className={btnToolMiddleClass}>
-              <FaMessage size={14} /> 토론
+              <FaMessage size={15} /> 토론
             </Link>
             <Link href={`/w/${encodedSlug}/history`} className={btnToolRightClass}>
-              <FaBook size={14} /> 역사
+              <FaBook size={15} /> 역사
             </Link>
           </div>
           <button className={btnToolClass} title="더보기">
-            <MoreVertical size={16} />
+            <MoreVertical size={15} />
           </button>
         </div>
       </div>
