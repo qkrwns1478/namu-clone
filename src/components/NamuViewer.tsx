@@ -556,7 +556,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
   // --- [6. 테이블 파서] ---
   const parseTable = (lines: string[]) => {
-    // 1. 셀 데이터 파싱 (기존과 동일)
+    // 1. 셀 데이터 파싱
     const rows = lines.map((line) => {
       const trimmed = line.trim();
       const rawCells = trimmed.split("||");
@@ -603,9 +603,31 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       }
     }
 
+    const isFloat = containerStyle.float === "left" || containerStyle.float === "right";
+
+    const wrapperStyle: React.CSSProperties = isFloat
+      ? {
+          float: containerStyle.float,
+          marginLeft: containerStyle.marginLeft,
+          marginRight: containerStyle.marginRight,
+          marginBottom: "10px",
+        }
+      : { marginBottom: "10px" };
+
+    const tableStyleCleaned = { ...containerStyle };
+    if (isFloat) {
+      delete tableStyleCleaned.float;
+      delete tableStyleCleaned.marginLeft;
+      delete tableStyleCleaned.marginRight;
+    }
+
     return (
-      <div className="overflow-x-auto my-4 w-full block" key={getKey("table-wrap")}>
-        <table className="text-gray-800" style={containerStyle}>
+      <div
+        className={`overflow-x-auto my-4 ${isFloat ? "inline-block" : "w-full block"}`}
+        style={wrapperStyle}
+        key={getKey("table-wrap")}
+      >
+        <table className="text-gray-800" style={tableStyleCleaned}>
           {maxCols > 0 && (
             <colgroup>
               {Array.from({ length: maxCols }).map((_, i) => (
@@ -630,7 +652,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
                         className="border px-2 py-1 align-middle break-words"
                         style={{
                           borderColor: containerStyle.borderColor || "#ccc",
-                          // 스타일 우선순위: 열 < 행 < 셀
                           ...currentValColStyle,
                           ...trStyle,
                           ...cell.style,
@@ -647,7 +668,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             })}
           </tbody>
         </table>
-        <div className="clear-both"></div>
       </div>
     );
   };
@@ -661,6 +681,10 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           {renderToc()}
         </div>
       );
+    }
+
+    if (line.toLowerCase() === "[clearfix]") {
+      return <div key={getKey("clearfix")} className="clear-both" />;
     }
 
     const headerMatch = line.match(/^(=+)\s*(.+?)\s*\1$/);
