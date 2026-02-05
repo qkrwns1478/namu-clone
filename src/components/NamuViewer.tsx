@@ -105,30 +105,28 @@ const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) 
   );
 };
 
-  // CSS 스타일 문자열을 React Style 객체로 변환하는 헬퍼 함수
-  const parseCssStyle = (styleString: string): React.CSSProperties => {
-    const style: any = {};
-    const rules = styleString.split(";");
+// CSS 스타일 문자열을 React Style 객체로 변환하는 헬퍼 함수
+const parseCssStyle = (styleString: string): React.CSSProperties => {
+  const style: any = {};
+  const rules = styleString.split(";");
 
-    rules.forEach((rule) => {
-      const parts = rule.split(":");
-      if (parts.length < 2) return;
+  rules.forEach((rule) => {
+    const parts = rule.split(":");
+    if (parts.length < 2) return;
 
-      // 속성명은 camelCase로 변환 (예: background-color -> backgroundColor)
-      const key = parts[0]
-        .trim()
-        .replace(/-(\w)/g, (_, c) => c.toUpperCase());
-      
-      // 값에 :이 포함될 수 있으므로(url 등) 나머지 부분을 합침
-      const value = parts.slice(1).join(":").trim();
+    const key = parts[0]
+      .trim()
+      .replace(/-(\w)/g, (_, c) => c.toUpperCase());
+    
+    const value = parts.slice(1).join(":").trim();
 
-      if (key && value) {
-        style[key] = value;
-      }
-    });
+    if (key && value) {
+      style[key] = value;
+    }
+  });
 
-    return style;
-  };
+  return style;
+};
 
 export default function NamuViewer({ content, existingSlugs = [] }: { content: string; existingSlugs?: string[] }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
@@ -251,7 +249,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
 
-    const braceIdx = text.indexOf("{{{"); // Brace는 중첩 처리를 위해 index만 확인
+    const braceIdx = text.indexOf("{{{"); 
 
     const youtubeRegex = /\[youtube\((.*?)\)\]/i;
     const youtubeMatch = youtubeRegex.exec(text);
@@ -268,7 +266,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     const delRegex = /~~(.*?)~~/;
     const delMatch = delRegex.exec(text);
 
-    // [2] 우선순위 결정을 위한 후보군 생성 (인덱스 오름차순 정렬)
     const candidates = [
       { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
       { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
@@ -279,11 +276,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       { type: "del", idx: delMatch ? delMatch.index : Infinity, match: delMatch },
     ].sort((a, b) => a.idx - b.idx);
 
-    // [3] 가장 먼저 등장하는 문법부터 순차적으로 처리
     for (const candidate of candidates) {
       if (candidate.idx === Infinity) break;
 
-      // --- [각주 파서] ---
       if (candidate.type === "note" && candidate.match) {
         const match = candidate.match;
         const before = text.slice(0, match.index);
@@ -301,7 +296,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         ];
       }
 
-      // --- [통합 {{{...}}} 파서] ---
       if (candidate.type === "brace") {
         let depth = 0;
         let endIdx = -1;
@@ -323,6 +317,44 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           const before = text.slice(0, candidate.idx);
           const rawContent = text.slice(candidate.idx + 3, endIdx);
           const after = text.slice(endIdx + 3);
+
+          // [FIX] 테이블 내 인라인 Folding 처리
+          if (rawContent.startsWith("#!folding")) {
+            const parts = rawContent.replace("#!folding", "").trim();
+            // 보통 {{{#!folding [제목] 내용... }}} 형식
+            let title = "more";
+            let foldingContent = parts;
+
+            const titleMatch = parts.match(/^\[(.*?)\]/);
+            if (titleMatch) {
+                title = titleMatch[1];
+                foldingContent = parts.substring(titleMatch[0].length).trim();
+            }
+
+            return [
+                ...parseInline(before),
+                <Folding key={getKey("folding-inline")} title={title}>
+                    {parseInline(foldingContent)}
+                </Folding>,
+                ...parseInline(after)
+            ];
+          }
+
+           // [FIX] 테이블 내 인라인 Wiki Style 처리
+           if (rawContent.startsWith("#!wiki")) {
+            const styleMatch = rawContent.match(/style="([^"]*)"/);
+            const styleString = styleMatch ? styleMatch[1] : "";
+            const customStyle = parseCssStyle(styleString);
+            const innerContent = rawContent.replace(/^#!wiki(\s+style="[^"]*")?/, "").trim();
+
+            return [
+                ...parseInline(before),
+                <div key={getKey("wiki-inline")} style={customStyle} className="inline-block">
+                    {parseInline(innerContent)}
+                </div>,
+                ...parseInline(after)
+            ];
+          }
 
           // 1. 색상
           if (rawContent.trim().startsWith("#")) {
@@ -380,7 +412,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
       }
 
-      // --- [유튜브 파서] ---
       if (candidate.type === "youtube" && candidate.match) {
         const match = candidate.match;
         const before = text.slice(0, match.index);
@@ -414,7 +445,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         ];
       }
 
-      // --- [위키 링크 파서] ---
       if (candidate.type === "wiki" && candidate.match) {
         const match = candidate.match;
         const before = text.slice(0, match.index);
@@ -456,7 +486,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
 
         const isExternal = /^https?:\/\//i.test(target);
-        const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target]; // 라벨 내부도 재귀 파싱
+        const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target];
 
         if (isExternal) {
           const hasImageInLabel = /\[\[(?:파일|File|이미지):/i.test(optionsRaw);
@@ -479,7 +509,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             ...parseInline(after),
           ];
         } else {
-          // [내부 링크 & 앵커 분리]
           const hashIndex = target.indexOf("#");
           let targetSlug = target;
           let anchor = "";
@@ -505,15 +534,11 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
       }
 
-      // --- [스타일 파서 (Bold, Underline, Del)] ---
-      // 이들이 candidates에 포함됨으로써, '''[[...]]''' 같은 경우 '''가 먼저 잡혀서 처리됨
-      
       if (candidate.type === "bold" && candidate.match) {
         const match = candidate.match;
         const before = text.slice(0, match.index);
         const inner = match[1];
         const after = text.slice(match.index + match[0].length);
-        // inner도 parseInline을 통해 내부의 링크 등을 처리
         return [...parseInline(before), <b key={getKey("bold")}>{parseInline(inner)}</b>, ...parseInline(after)];
       }
 
@@ -540,11 +565,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       }
     }
 
-    // 아무런 패턴도 매칭되지 않으면 텍스트 반환
     return [text];
   };
 
-  // --- [Helper] 색상 값 파싱 ---
   const parseColorValue = (val: string) => {
     if (!val) return "";
     if (val.includes(",")) {
@@ -553,7 +576,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     return val.trim();
   };
 
-  // --- [5. 파서 로직] ---
   const parseCellAttributes = (rawContent: string) => {
     let content = rawContent;
 
@@ -668,23 +690,19 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         style.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       }
-      // [수직 정렬 및 RowSpan 처리]
       else if (tagContent.startsWith("^|")) {
-        // <^|숫자>: 수직 위 정렬
         style.verticalAlign = "top";
         const val = parseInt(tagContent.slice(2));
         if (!isNaN(val)) rowSpan = val;
         handled = true;
       }
       else if (tagContent.startsWith("v|")) {
-        // <v|숫자>: 수직 아래 정렬
         style.verticalAlign = "bottom";
         const val = parseInt(tagContent.slice(2));
         if (!isNaN(val)) rowSpan = val;
         handled = true;
       }
       else if (tagContent.startsWith("|")) {
-        // <|숫자>: 수직 가운데 정렬 (기본값)
         style.verticalAlign = "middle";
         const val = parseInt(tagContent.slice(1));
         if (!isNaN(val)) {
@@ -692,7 +710,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           handled = true;
         }
       }
-      // [수평 정렬]
       else if (tagContent === "(") {
         style.textAlign = "left";
         handled = true;
@@ -703,7 +720,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         style.textAlign = "right";
         handled = true;
       }
-      // [ColSpan]
       else if (tagContent.startsWith("-")) {
         const val = parseInt(tagContent.slice(1));
         if (!isNaN(val)) {
@@ -711,7 +727,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           handled = true;
         }
       }
-      // [크기 설정]
       else if (lowerInner.startsWith("width=")) {
         style.width = formatSize(tagContent.split("=")[1]);
         handled = true;
@@ -747,7 +762,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     return { style, tableStyle, rowStyle, colStyle, colSpan, rowSpan, content };
   };
 
-  // --- [6. 테이블 파서] ---
   const parseTable = (lines: string[]) => {
     const rows = lines.map((line) => {
       const trimmed = line.trim();
@@ -976,7 +990,97 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     const nodes: React.ReactNode[] = [];
     let j = 0;
     while (j < subLines.length) {
-      const l = subLines[j].trim();
+      const l = subLines[j].replace(/\r$/, "").trim();
+
+      // [FIX] Folding/Wiki 중첩 지원을 위해 renderSubBlock 내에서도 블록 파싱 로직 추가
+
+      // --- [Wiki 블록 재귀 처리] ---
+      if (l.startsWith("{{{#!wiki")) {
+        const styleMatch = l.match(/style="([^"]*)"/);
+        const styleString = styleMatch ? styleMatch[1] : "";
+        const customStyle = parseCssStyle(styleString);
+        let currentLineContent = l.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
+
+        const contentLines: string[] = [];
+        let depth = 3;
+        let k = j;
+        let foundEnd = false;
+
+        while (k < subLines.length) {
+            let textToAnalyze = subLines[k];
+            if (k === j) textToAnalyze = currentLineContent;
+
+            const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
+            const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
+
+            depth += openMatches * 3;
+            depth -= closeMatches * 3;
+
+            if (depth <= 0) {
+                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+                if (contentToAdd.trim() || k !== j) {
+                    if (contentToAdd.trim()) contentLines.push(contentToAdd);
+                }
+                j = k + 1;
+                foundEnd = true;
+                break;
+            }
+
+            if (k === j) {
+                if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
+            } else {
+                contentLines.push(textToAnalyze);
+            }
+            k++;
+        }
+
+        if (foundEnd) {
+            nodes.push(
+                <div key={getKey("wiki-block-sub")} style={customStyle} className="wiki-block">
+                    {renderSubBlock(contentLines)}
+                </div>
+            );
+            continue;
+        }
+      }
+
+      // --- [Folding 블록 재귀 처리] ---
+      if (l.startsWith("{{{#!folding")) {
+        const title = l.replace("{{{#!folding", "").trim();
+        const contentLines: string[] = [];
+        let depth = 3; 
+        let k = j + 1;
+        let foundEnd = false;
+
+        while (k < subLines.length) {
+            const currentLine = subLines[k];
+            const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
+            const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
+            depth += (openMatches * 3);
+            depth -= (closeMatches * 3);
+
+            if (depth <= 0) {
+                const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, ""); 
+                if (cleanedLine.trim()) contentLines.push(cleanedLine);
+                j = k + 1;
+                foundEnd = true;
+                break;
+            }
+            contentLines.push(currentLine);
+            k++;
+        }
+
+        if (foundEnd) {
+            nodes.push(
+                <Folding key={getKey("folding-sub")} title={title}>
+                    {renderSubBlock(contentLines)}
+                </Folding>
+            );
+            continue;
+        }
+      }
+
+      // --- [Table 블록 처리] ---
       if (l.startsWith("||")) {
         const tLines = [];
         let m = j;
@@ -1012,7 +1116,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const customStyle = parseCssStyle(styleString);
 
       // 2. 시작 태그 제거 후 남은 텍스트 확인
-      // 예: {{{#!wiki style="..." 내용 시작 -> " 내용 시작"
       let currentLineContent = line.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
 
       const contentLines: string[] = [];
@@ -1032,26 +1135,19 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
 
         // 첫 줄은 이미 depth=3으로 시작했으므로, 추가적인 {{{ 만 더함
-        // 이후 줄은 {{{ 개수만큼 depth 추가
         depth += openMatches * 3;
         depth -= closeMatches * 3;
 
         if (depth <= 0) {
-          // 닫는 태그 발견
-          // 마지막 }}} 하나를 제거 (가장 뒤에 있는 것)
           let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
-          
           if (contentToAdd.trim() || k !== i) {
-            // 빈 줄이 아니거나, 여러 줄에 걸친 내용의 마지막 줄일 경우 추가
             if (contentToAdd.trim()) contentLines.push(contentToAdd);
           }
-          
           i = k + 1;
           foundEnd = true;
           break;
         }
 
-        // 닫는 태그가 이 줄에 없으면 통째로 추가
         if (k === i) {
           if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
         } else {
