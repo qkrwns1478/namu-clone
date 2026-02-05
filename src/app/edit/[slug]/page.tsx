@@ -35,27 +35,27 @@ export default async function EditPage({ params }: { params: Promise<{ slug: str
           {/* 역링크 */}
           <Link
             href="#"
-            className="px-3 py-1.5 border border-r-0 border-[#ccc] rounded rounded-r-none bg-white text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-1 transition-colors"
+            className="px-3 py-1.5 border border-r-0 border-[#ccc] rounded rounded-r-none bg-white text-[15px] text-gray-700 hover:bg-gray-50 flex items-center gap-1 transition-colors"
           >
-            <FaAnchor size={14} />
+            <FaAnchor size={15} />
             <span>역링크</span>
           </Link>
 
           {/* 이동 버튼 */}
           <Link
             href={`/move/${encodedSlug}`}
-            className="px-3 py-1.5 border border-r-0 border-[#ccc] bg-white text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-1 transition-colors"
+            className="px-3 py-1.5 border border-r-0 border-[#ccc] bg-white text-[15px] text-gray-700 hover:bg-gray-50 flex items-center gap-1 transition-colors"
           >
-            <FaCircleArrowRight size={14} />
+            <FaCircleArrowRight size={15} />
             <span>이동</span>
           </Link>
 
           {/* 삭제 버튼 */}
           <Link
             href={`/delete/${encodedSlug}`}
-            className="px-3 py-1.5 border border-[#ccc] rounded rounded-l-none bg-[#da4453] text-sm text-white hover:bg-[#c9302c] flex items-center gap-1 transition-colors"
+            className="px-3 py-1.5 border border-[#ccc] rounded rounded-l-none bg-[#da4453] text-[15px] text-white hover:bg-[#c9302c] flex items-center gap-1 transition-colors"
           >
-            <FaTrashCan size={14} />
+            <FaTrashCan size={15} />
             <span>삭제</span>
           </Link>
         </div>
