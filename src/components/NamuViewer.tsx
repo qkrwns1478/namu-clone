@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import React, { useState, useMemo } from 'react'
-import { ChevronDown, ChevronLeft } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // 목차 아이템 타입
 type TocItem = {
@@ -14,11 +14,25 @@ type TocItem = {
 
 export default function NamuViewer({ content }: { content: string }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set()); 
 
-  // 1. [목차 생성] 렌더링 전 전체 스캔
+  // 섹션 토글 함수
+  const toggleSection = (id: string) => {
+    setCollapsedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // 1. [목차 및 헤더 정보 생성]
   const { tocItems, headerMap } = useMemo(() => {
     const items: TocItem[] = [];
-    const hMap: { [key: number]: string } = {}; 
+    const hMap: { [lineIndex: number]: string } = {}; 
     const counters = [0, 0, 0, 0, 0, 0]; 
 
     const lines = content.split('\n');
@@ -30,34 +44,70 @@ export default function NamuViewer({ content }: { content: string }) {
         const level = headerMatch[1].length;
         const text = headerMatch[2];
 
-        if (level >= 2) { // == (h2) 부터 번호 매김
-          const counterIndex = level - 2;
-          counters[counterIndex]++;
-          for (let i = counterIndex + 1; i < counters.length; i++) counters[i] = 0;
+        if (level >= 1) { 
+            const counterIndex = level - 2; 
+            if (counterIndex >= 0) {
+                counters[counterIndex]++;
+                for (let i = counterIndex + 1; i < counters.length; i++) counters[i] = 0;
 
-          const numberParts = [];
-          for (let i = 0; i <= counterIndex; i++) numberParts.push(counters[i]);
-          
-          const numberStr = numberParts.join('.') + '.';
-          const id = `s-${numberStr.slice(0, -1)}`; 
+                const numberParts = [];
+                for (let i = 0; i <= counterIndex; i++) numberParts.push(counters[i]);
+                
+                const numberStr = numberParts.join('.') + '.';
+                const id = `s-${numberStr.slice(0, -1)}`; 
 
-          items.push({ id, text, level, numberStr });
-          hMap[lineIndex] = numberStr; 
+                items.push({ id, text, level, numberStr });
+                hMap[lineIndex] = numberStr; 
+            }
         }
       }
     });
     return { tocItems: items, headerMap: hMap };
   }, [content]);
 
-  // 2. [각주 저장소] 렌더링 시마다 초기화
-  const footnotes: React.ReactNode[] = [];
+  // 2. [가시성 계산]
+  const lines = content.split('\n');
+  const visibilityMap = new Array(lines.length).fill(true);
   
+  let currentHideLevel = 0; 
+
+  lines.forEach((line, i) => {
+    const rawLine = line.replace(/\r$/, '').trim();
+    const headerMatch = rawLine.match(/^(=+)\s*(.+?)\s*\1$/);
+
+    if (headerMatch) {
+        const level = headerMatch[1].length;
+
+        if (currentHideLevel > 0 && level <= currentHideLevel) {
+            currentHideLevel = 0;
+        }
+
+        if (currentHideLevel > 0 && level > currentHideLevel) {
+            visibilityMap[i] = false;
+            return; 
+        }
+
+        const numberStr = headerMap[i];
+        const id = numberStr ? `s-${numberStr.slice(0, -1)}` : undefined;
+        
+        if (id && collapsedSections.has(id)) {
+            currentHideLevel = level; 
+        }
+    } else {
+        if (currentHideLevel > 0) {
+            visibilityMap[i] = false;
+        }
+    }
+  });
+
+
+  // 3. [각주 저장소]
+  const footnotes: React.ReactNode[] = [];
   let keyCounter = 0;
   const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
 
-  // 3. 인라인 파서
+  // 4. 인라인 파서
   const parseInline = (text: string): React.ReactNode[] => {
-    // [각주]
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
     if (noteMatch) {
@@ -65,7 +115,6 @@ export default function NamuViewer({ content }: { content: string }) {
       const noteContent = noteMatch[1];
       const after = text.slice(noteMatch.index + noteMatch[0].length);
       
-      // 각주 내용 저장 (재귀 파싱)
       footnotes.push(
         <span key={getKey('fn-content')}>
             {parseInline(noteContent)}
@@ -82,7 +131,6 @@ export default function NamuViewer({ content }: { content: string }) {
       ];
     }
     
-    // [이미지]
     const imgRegex = /\{\{\{(.*?)\}\}\}/;
     const imgMatch = imgRegex.exec(text);
     if (imgMatch) {
@@ -96,7 +144,6 @@ export default function NamuViewer({ content }: { content: string }) {
       ];
     }
 
-    // [볼드]
     const boldRegex = /'''(.*?)'''/;
     const boldMatch = boldRegex.exec(text);
     if (boldMatch) {
@@ -106,7 +153,6 @@ export default function NamuViewer({ content }: { content: string }) {
       return [...parseInline(before), <b key={getKey('bold')}>{inner}</b>, ...parseInline(after)];
     }
 
-    // [취소선]
     const delRegex = /~~(.*?)~~/;
     const delMatch = delRegex.exec(text);
     if (delMatch) {
@@ -116,7 +162,6 @@ export default function NamuViewer({ content }: { content: string }) {
       return [...parseInline(before), <del key={getKey('del')} className="text-gray-400">{inner}</del>, ...parseInline(after)];
     }
 
-    // [링크]
     const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/;
     const linkMatch = linkRegex.exec(text);
     if (linkMatch) {
@@ -134,7 +179,7 @@ export default function NamuViewer({ content }: { content: string }) {
     return [text];
   };
 
-  // 4. 라인 파서
+  // 5. 라인 파서
   const parseLine = (rawLine: string, lineIndex: number) => {
     const line = rawLine.replace(/\r$/, '').trim();
 
@@ -153,14 +198,46 @@ export default function NamuViewer({ content }: { content: string }) {
         6: "text-sm mt-2 font-bold"
       };
 
-      const numberStr = headerMap[lineIndex]; // 미리 계산된 번호 (예: 2.1.)
+      const numberStr = headerMap[lineIndex];
       const id = numberStr ? `s-${numberStr.slice(0, -1)}` : undefined;
+      const isCollapsed = id ? collapsedSections.has(id) : false;
 
       const headerContent = (
-        <span className="flex items-center w-full">
-          {numberStr && <a href={`#${id}`} className="mr-2 text-[#0275d8] hover:!underline"><span>{numberStr}</span></a>}
+        // [수정] 제목 전체 영역 클릭 시 토글 (cursor-pointer 추가, onClick 이동)
+        <span 
+          className="flex items-center w-full group cursor-pointer"
+          onClick={() => {
+            if (id) toggleSection(id);
+          }}
+        >
+          {/* 화살표 아이콘 (클릭 이벤트 제거 -> 부모 이벤트 따름) */}
+          {id && (
+            <span className="text-[#666] mr-2 text-xs font-normal">
+              {isCollapsed ? <ChevronRight /> : <ChevronDown />}
+            </span>
+          )}
+          
+          {/* 섹션 번호 (클릭 시 토글 방지, 링크 기능만 수행) */}
+          {numberStr && (
+            <a 
+              href={`#${id}`} 
+              className="mr-2 text-[#0275d8] hover:!underline"
+              onClick={(e) => e.stopPropagation()} 
+            >
+              <span>{numberStr}</span>
+            </a>
+          )}
+          
+          {/* 제목 텍스트 */}
           <span>{text}</span>
-          <span className="ml-auto text-[#0275d8] text-xs cursor-pointer font-normal select-none hover:underline">[편집]</span>
+          
+          {/* 우측 편집 버튼 (클릭 시 토글 방지) */}
+          <div 
+            className="ml-auto flex gap-2 select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-[#0275d8] text-xs cursor-pointer font-normal hover:underline">[편집]</span>
+          </div>
         </span>
       );
 
@@ -169,18 +246,17 @@ export default function NamuViewer({ content }: { content: string }) {
         { 
           key: getKey('header'), 
           id: id,
-          className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center group scroll-mt-[60px]`
+          // 접혔을 때 opacity-50 적용
+          className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center scroll-mt-[60px] ${isCollapsed ? 'opacity-50' : ''}`
         },
         headerContent
       );
 
-      // 첫 번째 헤더 위에 목차 삽입
       const isFirstTocHeader = tocItems.length > 0 && tocItems[0].numberStr === numberStr;
       
       if (isFirstTocHeader) {
         return (
           <React.Fragment key={getKey('toc-fragment')}>
-            {/* 목차 박스 */}
             <div className="px-5 py-3 mb-6 border border-[#ccc] bg-white inline-block min-w-[120px] max-w-full">
               <div 
                 className="flex justify-between items-center cursor-pointer select-none"
@@ -214,7 +290,7 @@ export default function NamuViewer({ content }: { content: string }) {
     }
 
     // [리스트]
-    const listMatch = rawLine.replace(/\r$/, '').match(/^(\s*)\*\s*(.*)$/); // rawLine 사용 (들여쓰기 유지)
+    const listMatch = rawLine.replace(/\r$/, '').match(/^(\s*)\*\s*(.*)$/);
     if (listMatch) {
       const indentLevel = listMatch[1].length; 
       const content = listMatch[2]; 
@@ -228,9 +304,7 @@ export default function NamuViewer({ content }: { content: string }) {
     }
 
     if (!line) return <br key={getKey('br')} />;
-
     if (line.startsWith('[[분류:') && line.endsWith(']]')) return null;
-
     if (line.match(/^-{4,}$/)) return <hr key={getKey('hr')} className="my-4 border-gray-300" />;
 
     if (line.startsWith('>')) {
@@ -248,21 +322,22 @@ export default function NamuViewer({ content }: { content: string }) {
     );
   };
 
-  // 5. 최종 렌더링
-  const parsedContent = content.split('\n').map((line, i) => (
-    <React.Fragment key={i}>
-      {parseLine(line, i)}
-    </React.Fragment>
-  ));
+  // 6. 최종 렌더링
+  const parsedContent = lines.map((line, i) => {
+      if (!visibilityMap[i]) return null;
+      return (
+        <React.Fragment key={i}>
+            {parseLine(line, i)}
+        </React.Fragment>
+      );
+  });
 
   return (
     <div>
-      {/* 본문 영역 */}
       <div className="prose max-w-none text-gray-800 text-[15px]">
         {parsedContent}
       </div>
 
-      {/* 각주 영역 */}
       {footnotes.length > 0 && (
         <div className="border-t mt-5 mb-5 pt-4 border-[#777]">
           <ol className="list-none space-y-1 text-sm text-gray-600">
