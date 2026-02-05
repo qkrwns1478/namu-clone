@@ -14,6 +14,34 @@ type TocItem = {
   numberStr: string;
 };
 
+// Folding 컴포넌트
+const Folding = ({ title, children }: { title: string; children: React.ReactNode }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="my-2">
+      <div
+        className="cursor-pointer select-none inline-block"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="font-bold text-gray-800">{title}</span>
+      </div>
+
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+          isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="mt-2">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // 각주 툴팁 컴포넌트
 const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -226,7 +254,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const innerContent = sizeMatch[3]; // 내부 텍스트
       const after = text.slice(sizeMatch.index + sizeMatch[0].length);
 
-      // 요청하신 사이즈 매핑 테이블
       const sizeMapping: { [key: string]: string } = {
         "+1": "1.28889em",
         "+2": "1.38889em",
@@ -410,10 +437,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     return [text];
   };
 
-  // --- [Helper] 색상 값 파싱 (쉼표 지원) ---
+  // --- [Helper] 색상 값 파싱 ---
   const parseColorValue = (val: string) => {
     if (!val) return "";
-    // (라이트, 다크) -> 라이트 모드만 지원
     if (val.includes(",")) {
       return val.split(",")[0].trim();
     }
@@ -431,7 +457,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     let colSpan = 1;
     let rowSpan = 1;
 
-    // 단위 보정 헬퍼 함수 (숫자만 있으면 px 붙임)
     const formatSize = (val: string) => {
       if (!val) return undefined;
       const trimVal = val.trim();
@@ -449,13 +474,11 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const lowerInner = tagContent.toLowerCase().trim();
       let handled = false;
 
-      // [1] tablebordercolor
       if (lowerInner.startsWith("tablebordercolor=")) {
         const v = parseColorValue(tagContent.split("=")[1]);
         tableStyle.border = `2px solid ${v}`;
         handled = true;
       }
-      // [2] tablealign
       else if (lowerInner.startsWith("tablealign=")) {
         const v = lowerInner.split("=")[1];
         if (v === "right") {
@@ -471,13 +494,11 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
         handled = true;
       }
-      // tablewidth (단독 태그 처리)
       else if (lowerInner.startsWith("tablewidth=")) {
         const v = tagContent.split("=")[1];
-        tableStyle.width = formatSize(v); // 400 -> 400px 변환
+        tableStyle.width = formatSize(v); 
         handled = true;
       }
-      // [3] table 옵션 파싱
       else if (lowerInner.startsWith("table")) {
         const optsStr = tagContent.substring(5).trim();
         const opts = optsStr.split(/\s+/);
@@ -492,7 +513,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             } else if (k === "bgcolor") {
               tableStyle.backgroundColor = v;
             } 
-            // width 속성에 단위 보정 적용
             else if (k === "width") {
               tableStyle.width = formatSize(v);
             }
@@ -512,7 +532,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         });
         handled = true;
       }
-      // [4] 행 속성
       else if (lowerInner.startsWith("rowbgcolor=")) {
         rowStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
         handled = true;
@@ -520,7 +539,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         rowStyle.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       }
-      // [5] 열 속성
       else if (lowerInner.startsWith("colbgcolor=")) {
         colStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
         handled = true;
@@ -528,12 +546,10 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         colStyle.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       }
-      // [6] nopad
       else if (lowerInner === "nopad") {
         style.padding = "0px";
         handled = true;
       }
-      // [7] bgcolor
       else if (lowerInner.startsWith("bgcolor=")) {
         style.backgroundColor = parseColorValue(tagContent.split("=")[1]);
         handled = true;
@@ -541,12 +557,10 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         style.backgroundColor = parseColorValue(tagContent);
         handled = true;
       }
-      // [8] color
       else if (lowerInner.startsWith("color=")) {
         style.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       }
-      // [9] 정렬
       else if (tagContent === "(") {
         style.textAlign = "left";
         handled = true;
@@ -557,7 +571,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         style.textAlign = "right";
         handled = true;
       }
-      // [10] 병합
       else if (tagContent.startsWith("-")) {
         const val = parseInt(tagContent.slice(1));
         if (!isNaN(val)) {
@@ -571,7 +584,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           handled = true;
         }
       }
-      // [11] 셀 너비/높이
       else if (lowerInner.startsWith("width=")) {
         style.width = formatSize(tagContent.split("=")[1]);
         handled = true;
@@ -609,7 +621,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
   // --- [6. 테이블 파서] ---
   const parseTable = (lines: string[]) => {
-    // 1. 셀 데이터 파싱
     const rows = lines.map((line) => {
       const trimmed = line.trim();
       const rawCells = trimmed.split("||");
@@ -638,7 +649,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     if (rows.length > 0) {
       rows.forEach((r) => maxCols = Math.max(maxCols, r.length));
 
-      // colStyle 수집 (colcolor 지원)
       rows.forEach((cells) => {
         cells.forEach((cell, cIdx) => {
           if (Object.keys(cell.colStyle).length > 0) {
@@ -647,7 +657,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         });
       });
 
-      // 첫 행 첫 셀의 스타일을 테이블 전체 스타일로 병합
       if (rows[0].length > 0) {
         const first = rows[0][0];
         if (first.tableStyle && Object.keys(first.tableStyle).length > 0) {
@@ -835,6 +844,28 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     );
   };
 
+  const renderSubBlock = (subLines: string[]) => {
+    const nodes: React.ReactNode[] = [];
+    let j = 0;
+    while (j < subLines.length) {
+      const l = subLines[j].trim();
+      if (l.startsWith("||")) {
+        const tLines = [];
+        let m = j;
+        while (m < subLines.length && subLines[m].trim().startsWith("||")) {
+          tLines.push(subLines[m]);
+          m++;
+        }
+        nodes.push(parseTable(tLines));
+        j = m;
+      } else {
+        nodes.push(parseLine(subLines[j], -1));
+        j++;
+      }
+    }
+    return nodes;
+  };
+
   const renderedContent: React.ReactNode[] = [];
   let i = 0;
 
@@ -845,6 +876,46 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     }
 
     const line = lines[i].replace(/\r$/, "").trim();
+
+    // [접기/펼치기 파서]
+    if (line.startsWith("{{{#!folding")) {
+      const title = line.replace("{{{#!folding", "").trim();
+      
+      const contentLines: string[] = [];
+      let depth = 3; 
+      let k = i + 1;
+      let foundEnd = false;
+
+      while (k < lines.length) {
+        const currentLine = lines[k];
+        
+        const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
+        const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
+        
+        depth += (openMatches * 3);
+        depth -= (closeMatches * 3);
+
+        if (depth <= 0) {
+          const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, ""); 
+          if (cleanedLine.trim()) contentLines.push(cleanedLine);
+          i = k + 1;
+          foundEnd = true;
+          break;
+        }
+        
+        contentLines.push(currentLine);
+        k++;
+      }
+
+      if (foundEnd) {
+        renderedContent.push(
+          <Folding key={getKey("folding")} title={title}>
+            {renderSubBlock(contentLines)}
+          </Folding>
+        );
+        continue;
+      }
+    }
 
     if (line.startsWith("||")) {
       const tableLines = [];
