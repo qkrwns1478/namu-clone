@@ -122,7 +122,7 @@ export default function NamuViewer({ content }: { content: string }) {
       const text = headerMatch[2];
       const sizes: { [key: number]: string } = {
         1: "text-3xl mt-6 mb-4 border-b-2 pb-2",
-        2: "text-2xl mt-5 mb-3 border-b pb-1",
+        2: "text-2xl font-bold mt-5 mb-3 border-b pb-1",
         3: "text-xl mt-4 mb-2 font-bold",
         4: "text-lg mt-3 mb-1 font-bold",
         5: "text-base mt-2 font-bold",
@@ -130,9 +130,12 @@ export default function NamuViewer({ content }: { content: string }) {
       };
       return React.createElement(
         `h${level}`,
-        { key: getKey('header'), className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center group` },
+        { 
+          key: getKey('header'), 
+          className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center group w-full` 
+        },
         text,
-        <span className="ml-2 text-[#00A495] text-xs opacity-0 group-hover:opacity-100 cursor-pointer font-normal select-none">[편집]</span>
+        <span className="ml-auto text-[#0275d8] text-xs cursor-pointer font-normal select-none">[편집]</span>
       );
     }
 
@@ -164,14 +167,13 @@ export default function NamuViewer({ content }: { content: string }) {
   return (
     <div>
       {/* 본문 영역 */}
-      <div className="prose max-w-none text-gray-800 mb-10 text-[15px]">
+      <div className="prose max-w-none text-gray-800 text-[15px]">
         {parsedContent}
       </div>
 
       {/* 각주 영역 */}
       {footnotes.length > 0 && (
-        <div className="border-t mt-8 pt-4 bg-[#fcfcfc] p-4 rounded-sm border-gray-200">
-          <h3 className="font-bold text-lg mb-2 text-gray-700 border-b pb-2">[각주]</h3>
+        <div className="border-t mt-5 mb-5 pt-4 border-[#777]">
           <ol className="list-none space-y-1 text-sm text-gray-600">
             {footnotes.map((note, index) => {
               const num = index + 1;
@@ -182,7 +184,7 @@ export default function NamuViewer({ content }: { content: string }) {
                     className="text-[#0275d8] shrink-0 hover:underline min-w-[20px] text-right"
                     title="본문으로 이동"
                   >
-                    {num}.
+                    [{num}]
                   </a>
                   <span>{note}</span>
                 </li>

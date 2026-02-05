@@ -1,6 +1,8 @@
 'use client'
 
-import { Search, Menu, User, Bell, Compass, ArrowRight } from 'lucide-react'
+import { Search, Menu, Bell, Compass, ArrowRight, MessagesSquare } from 'lucide-react'
+import { TbClockEdit } from "react-icons/tb";
+import { FaUser } from "react-icons/fa6";
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -18,7 +20,7 @@ export default function Header() {
 
   return (
     <nav 
-      className="h-[54px] flex items-center justify-center fixed top-0 w-full z-50 shadow-md border-b border-[#008f82]"
+      className="h-[56px] flex items-center justify-center w-full z-50"
       style={{
         backgroundImage: 'linear-gradient(90deg, rgb(0, 166, 156), rgb(0, 166, 156), rgb(40, 180, 114))'
       }}
@@ -36,16 +38,16 @@ export default function Header() {
                 alt="namu.wiki" 
                 width={100} 
                 height={40} 
-                className="object-contain h-[35px] w-auto"
+                className="object-contain h-[40px] w-auto"
                 priority
             />
           </Link>
-          <div className="hidden lg:flex gap-1 text-white text-[13px] font-bold ml-2">
-            <Link href="/recent-changes" className="hover:bg-[#008f82] px-3 py-4 flex items-center gap-1 transition-colors">
-              <Compass size={14} /> 최근 변경
+          <div className="hidden lg:flex gap-1 text-white text-[16px] font-bold ml-2">
+            <Link href="/recent-changes" className="rounded hover:bg-white/20 p-2 flex items-center gap-2 transition-colors">
+              <TbClockEdit size={20} /> 최근 변경
             </Link>
-            <Link href="/recent-discuss" className="hover:bg-[#008f82] px-3 py-4 flex items-center gap-1 transition-colors">
-              <Compass size={14} /> 최근 토론
+            <Link href="/recent-discuss" className="rounded hover:bg-white/20 p-2 flex items-center gap-2 transition-colors">
+              <MessagesSquare size={20} /> 최근 토론
             </Link>
           </div>
         </div>
@@ -55,7 +57,7 @@ export default function Header() {
           
           {/* 검색창 */}
           <form onSubmit={handleSearch} className="hidden sm:block w-[270px]">
-            <div className="flex items-center bg-white w-full h-[36px] px-3 rounded-[2px] shadow-sm">
+            <div className="flex items-center bg-white w-full h-[36px] px-3 rounded-[4px] hover:shadow-[0_0_0_.25rem_hsla(0,0%,100%,0.4)] transition duration-150 ease-in-out">
               <input
                 type="text"
                 value={query}
@@ -64,9 +66,9 @@ export default function Header() {
                 placeholder="여기에서 검색"
               />
               <div className="flex items-center gap-1 text-gray-500 shrink-0">
-                <Search size={18} className="cursor-pointer hover:text-gray-700" onClick={handleSearch} />
+                <Search size={16} className="cursor-pointer hover:text-gray-700" onClick={handleSearch} />
                 <button type="submit" className="flex items-center justify-center hover:text-gray-700">
-                  <ArrowRight size={18} />
+                  <ArrowRight size={16} />
                 </button>
               </div>
             </div>
@@ -74,8 +76,8 @@ export default function Header() {
 
           {/* 아이콘 버튼들 */}
           <div className="flex items-center text-white">
-            <button className="p-3 hover:bg-[#008f82] transition-colors"><Bell size={20} /></button>
-            <button className="p-3 hover:bg-[#008f82] transition-colors"><User size={20} /></button>
+            {/* <button className="p-2 rounded hover:bg-white/20 transition-colors"><Bell size={20} /></button> */}
+            <button className="p-2 rounded hover:bg-white/20 transition-colors"><FaUser size={20} /></button>
           </div>
         </div>
 

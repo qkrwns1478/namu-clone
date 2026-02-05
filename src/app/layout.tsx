@@ -9,10 +9,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="pt-[60px] pb-10">
+      <body>
         <Header />
         
-        <div className="max-w-[1300px] mx-auto px-2 sm:px-4 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 mt-4">
+        <div className="max-w-[1300px] mx-auto px-2 sm:px-4 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 mt-4">
           {/* 메인 콘텐츠 영역 */}
           <main className="min-w-0">
             {children}
@@ -23,7 +23,7 @@ export default function RootLayout({
         </div>
         
         {/* 푸터 */}
-        <footer className="mt-10 py-8 text-center text-xs text-gray-500 border-t">
+        <footer className="mt-10 py-8 bg-white text-center text-xs text-gray-500 border-t border-[#ccc]">
           <p>Powered by Next.js & Prisma (Clone Project)</p>
         </footer>
       </body>
