@@ -643,6 +643,31 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         style.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       }
+      // [수직 정렬 및 RowSpan 처리]
+      else if (tagContent.startsWith("^|")) {
+        // <^|숫자>: 수직 위 정렬
+        style.verticalAlign = "top";
+        const val = parseInt(tagContent.slice(2));
+        if (!isNaN(val)) rowSpan = val;
+        handled = true;
+      }
+      else if (tagContent.startsWith("v|")) {
+        // <v|숫자>: 수직 아래 정렬
+        style.verticalAlign = "bottom";
+        const val = parseInt(tagContent.slice(2));
+        if (!isNaN(val)) rowSpan = val;
+        handled = true;
+      }
+      else if (tagContent.startsWith("|")) {
+        // <|숫자>: 수직 가운데 정렬 (기본값)
+        style.verticalAlign = "middle";
+        const val = parseInt(tagContent.slice(1));
+        if (!isNaN(val)) {
+          rowSpan = val;
+          handled = true;
+        }
+      }
+      // [수평 정렬]
       else if (tagContent === "(") {
         style.textAlign = "left";
         handled = true;
@@ -653,19 +678,15 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         style.textAlign = "right";
         handled = true;
       }
+      // [ColSpan]
       else if (tagContent.startsWith("-")) {
         const val = parseInt(tagContent.slice(1));
         if (!isNaN(val)) {
           colSpan = val;
           handled = true;
         }
-      } else if (tagContent.startsWith("|")) {
-        const val = parseInt(tagContent.slice(1));
-        if (!isNaN(val)) {
-          rowSpan = val;
-          handled = true;
-        }
       }
+      // [크기 설정]
       else if (lowerInner.startsWith("width=")) {
         style.width = formatSize(tagContent.split("=")[1]);
         handled = true;
