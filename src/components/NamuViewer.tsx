@@ -243,39 +243,109 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       ];
     }
 
-    // 텍스트 크기 {{{+1 ...}}} / {{{-1 ...}}}
-    const sizeRegex = /\{\{\{([+-])([1-5])\s*(.*?)\}\}\}/;
-    const sizeMatch = sizeRegex.exec(text);
+    // [통합 {{{...}}} 파서: 색상 및 크기 및 중첩 지원]
+    const braceIdx = text.indexOf("{{{");
+    if (braceIdx !== -1) {
+      let depth = 0;
+      let endIdx = -1;
 
-    if (sizeMatch) {
-      const before = text.slice(0, sizeMatch.index);
-      const sign = sizeMatch[1]; // + 또는 -
-      const level = sizeMatch[2]; // 1 ~ 5
-      const innerContent = sizeMatch[3]; // 내부 텍스트
-      const after = text.slice(sizeMatch.index + sizeMatch[0].length);
+      for (let i = braceIdx; i < text.length; i++) {
+        if (text.startsWith("{{{", i)) {
+          depth++;
+          i += 2;
+        } else if (text.startsWith("}}}", i)) {
+          depth--;
+          if (depth === 0) {
+            endIdx = i;
+            break;
+          }
+          i += 2;
+        }
+      }
 
-      const sizeMapping: { [key: string]: string } = {
-        "+1": "1.28889em",
-        "+2": "1.38889em",
-        "+3": "1.48144em",
-        "+4": "1.57400em",
-        "+5": "1.66667em",
-        "-1": "0.92589em",
-        "-2": "0.83333em",
-        "-3": "0.74067em",
-        "-4": "0.64811em",
-        "-5": "0.62222em",
-      };
+      if (endIdx !== -1) {
+        const before = text.slice(0, braceIdx);
+        const rawContent = text.slice(braceIdx + 3, endIdx); // {{{ 와 }}} 사이의 내용
+        const after = text.slice(endIdx + 3);
 
-      const targetSize = sizeMapping[`${sign}${level}`] || "1em";
+        // 1. 색상 파싱: #으로 시작
+        if (rawContent.trim().startsWith("#")) {
+          // 문법: {{{#color 텍스트}}}
+          // 텍스트와 색상 구분 (첫 번째 공백 기준)
+          const spaceIdx = rawContent.indexOf(" ");
+          let colorDef = "";
+          let innerContent = "";
 
-      return [
-        ...parseInline(before),
-        <span key={getKey("size")} style={{ fontSize: targetSize }}>
-          {parseInline(innerContent)}
-        </span>,
-        ...parseInline(after),
-      ];
+          if (spaceIdx !== -1) {
+            colorDef = rawContent.slice(0, spaceIdx);
+            innerContent = rawContent.slice(spaceIdx + 1);
+          } else {
+            colorDef = rawContent;
+            innerContent = ""; // 텍스트가 없는 경우
+          }
+
+          // 색상 값 처리
+          // 1) 콤마가 있으면 첫 번째 것만 사용 (#888,#ff0 -> #888)
+          let colorVal = colorDef.split(",")[0].trim();
+          
+          // 2) #transparent 처리
+          if (colorVal === "#transparent") {
+            colorVal = "transparent";
+          } else if (colorVal.startsWith("#")) {
+            // 3) #red 처럼 HTML 색상 이름에 #이 붙은 경우 # 제거 (Hex 코드가 아닌 경우)
+            // 간단한 Hex 검증 (3~8자리 16진수)
+            const isHex = /^#[0-9A-Fa-f]{3,8}$/.test(colorVal);
+            if (!isHex) {
+              colorVal = colorVal.substring(1); // #red -> red
+            }
+          }
+
+          return [
+            ...parseInline(before),
+            <span key={getKey("color")} style={{ color: colorVal }}>
+              {parseInline(innerContent)}
+            </span>,
+            ...parseInline(after),
+          ];
+        }
+
+        // 2. 텍스트 크기 파싱: +1 ~ +5 / -1 ~ -5
+        const sizeMatch = rawContent.match(/^([+-])([1-5])\s+(.*)$/s);
+        if (sizeMatch) {
+          const sign = sizeMatch[1];
+          const level = sizeMatch[2];
+          const innerContent = sizeMatch[3];
+
+          const sizeMapping: { [key: string]: string } = {
+            "+1": "1.28889em",
+            "+2": "1.38889em",
+            "+3": "1.48144em",
+            "+4": "1.57400em",
+            "+5": "1.66667em",
+            "-1": "0.92589em",
+            "-2": "0.83333em",
+            "-3": "0.74067em",
+            "-4": "0.64811em",
+            "-5": "0.62222em",
+          };
+          const targetSize = sizeMapping[`${sign}${level}`] || "1em";
+
+          return [
+            ...parseInline(before),
+            <span key={getKey("size")} style={{ fontSize: targetSize }}>
+              {parseInline(innerContent)}
+            </span>,
+            ...parseInline(after),
+          ];
+        }
+        
+        // 문법에 맞지 않는 {{{...}}}는 내부만 파싱해서 반환 (혹은 원문 유지)
+        return [
+          ...parseInline(before),
+          ...parseInline(rawContent),
+          ...parseInline(after)
+        ];
+      }
     }
 
     // 유튜브 파서 [youtube(ID)]
@@ -417,6 +487,20 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const inner = boldMatch[1];
       const after = text.slice(boldMatch.index + boldMatch[0].length);
       return [...parseInline(before), <b key={getKey("bold")}>{inner}</b>, ...parseInline(after)];
+    }
+
+    // 밑줄 파서 (__...__)
+    const underlineRegex = /__(.*?)__/;
+    const underlineMatch = underlineRegex.exec(text);
+    if (underlineMatch) {
+        const before = text.slice(0, underlineMatch.index);
+        const inner = underlineMatch[1];
+        const after = text.slice(underlineMatch.index + underlineMatch[0].length);
+        return [
+            ...parseInline(before),
+            <u key={getKey("underline")}>{inner}</u>,
+            ...parseInline(after)
+        ];
     }
 
     const delRegex = /~~(.*?)~~/;
