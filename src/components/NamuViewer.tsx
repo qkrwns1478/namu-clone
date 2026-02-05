@@ -251,6 +251,46 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       ];
     }
 
+    // 유튜브 파서 [youtube(ID)]
+    const youtubeRegex = /\[youtube\((.*?)\)\]/i;
+    const youtubeMatch = youtubeRegex.exec(text);
+
+    if (youtubeMatch) {
+      const before = text.slice(0, youtubeMatch.index);
+      const argsRaw = youtubeMatch[1];
+      const after = text.slice(youtubeMatch.index + youtubeMatch[0].length);
+
+      const args = argsRaw.split(",");
+      const videoId = args[0].trim();
+      
+      let width = "640px";
+      let height = "360px";
+      
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i].trim();
+        if (arg.startsWith("width=")) width = arg.split("=")[1];
+        if (arg.startsWith("height=")) height = arg.split("=")[1];
+      }
+
+      return [
+        ...parseInline(before),
+        <div key={getKey("youtube")} className="block max-w-full">
+          <iframe
+            width={width.replace("px", "")}
+            height={height.replace("px", "")}
+            src={`https://www.youtube.com/embed/${videoId}`}
+            title="YouTube video player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{ maxWidth: "100%", width: width, height: height }}
+            className="border-0"
+          />
+        </div>,
+        ...parseInline(after),
+      ];
+    }
+
     // [통합 위키 문법]
     const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
     const match = wikiRegex.exec(text);
