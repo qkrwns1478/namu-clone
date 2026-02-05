@@ -382,7 +382,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
   // --- [5. 파서 로직] ---
   const parseCellAttributes = (rawContent: string) => {
-    // 1. 태그 파싱
     let content = rawContent;
 
     let style: React.CSSProperties = {};
@@ -392,7 +391,13 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     let colSpan = 1;
     let rowSpan = 1;
 
-    // 반복문으로 맨 앞의 태그 추출
+    // 단위 보정 헬퍼 함수 (숫자만 있으면 px 붙임)
+    const formatSize = (val: string) => {
+      if (!val) return undefined;
+      const trimVal = val.trim();
+      return /^\d+$/.test(trimVal) ? `${trimVal}px` : trimVal;
+    };
+
     while (true) {
       const trimmedCheck = content.trimStart();
       if (!trimmedCheck.startsWith("<")) break;
@@ -410,7 +415,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         tableStyle.border = `2px solid ${v}`;
         handled = true;
       }
-      // [2] tablealign (표 정렬)
+      // [2] tablealign
       else if (lowerInner.startsWith("tablealign=")) {
         const v = lowerInner.split("=")[1];
         if (v === "right") {
@@ -426,7 +431,13 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
         handled = true;
       }
-      // [3] 테이블 전체 속성 (<table ...>) - 일반적인 table 태그
+      // tablewidth (단독 태그 처리)
+      else if (lowerInner.startsWith("tablewidth=")) {
+        const v = tagContent.split("=")[1];
+        tableStyle.width = formatSize(v); // 400 -> 400px 변환
+        handled = true;
+      }
+      // [3] table 옵션 파싱
       else if (lowerInner.startsWith("table")) {
         const optsStr = tagContent.substring(5).trim();
         const opts = optsStr.split(/\s+/);
@@ -438,8 +449,13 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
             if (k === "bordercolor") {
               tableStyle.borderColor = v;
-            } else if (k === "bgcolor") tableStyle.backgroundColor = v;
-            else if (k === "width") tableStyle.width = v;
+            } else if (k === "bgcolor") {
+              tableStyle.backgroundColor = v;
+            } 
+            // width 속성에 단위 보정 적용
+            else if (k === "width") {
+              tableStyle.width = formatSize(v);
+            }
             else if (k === "align") {
               if (v === "right") {
                 tableStyle.float = "right";
@@ -472,12 +488,12 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         colStyle.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       }
-      // [6] 셀 여백 제거 (nopad)
+      // [6] nopad
       else if (lowerInner === "nopad") {
         style.padding = "0px";
         handled = true;
       }
-      // [7] 셀 배경색
+      // [7] bgcolor
       else if (lowerInner.startsWith("bgcolor=")) {
         style.backgroundColor = parseColorValue(tagContent.split("=")[1]);
         handled = true;
@@ -485,12 +501,12 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         style.backgroundColor = parseColorValue(tagContent);
         handled = true;
       }
-      // [8] 셀 글자색
+      // [8] color
       else if (lowerInner.startsWith("color=")) {
         style.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       }
-      // [9] 텍스트 정렬 (명시적 태그)
+      // [9] 정렬
       else if (tagContent === "(") {
         style.textAlign = "left";
         handled = true;
@@ -515,14 +531,12 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           handled = true;
         }
       }
-      // [11] 너비/높이
+      // [11] 셀 너비/높이
       else if (lowerInner.startsWith("width=")) {
-        const val = tagContent.split("=")[1];
-        style.width = /^\d+$/.test(val) ? `${val}px` : val;
+        style.width = formatSize(tagContent.split("=")[1]);
         handled = true;
       } else if (lowerInner.startsWith("height=")) {
-        const val = tagContent.split("=")[1];
-        style.height = /^\d+$/.test(val) ? `${val}px` : val;
+        style.height = formatSize(tagContent.split("=")[1]);
         handled = true;
       }
 
@@ -538,7 +552,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       }
     }
 
-    // 2. 공백 기반 정렬 감지
     if (!style.textAlign) {
       if (content.startsWith(" ") && content.endsWith(" ")) {
         style.textAlign = "center";
