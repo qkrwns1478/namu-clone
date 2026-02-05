@@ -310,7 +310,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
 
         // 2. 텍스트 크기 파싱: +1 ~ +5 / -1 ~ -5
-        const sizeMatch = rawContent.match(/^([+-])([1-5])\s+(.*)$/s);
+        const sizeMatch = rawContent.match(/^\s*([+-])([1-5])\s+([\s\S]*)$/);
         if (sizeMatch) {
           const sign = sizeMatch[1];
           const level = sizeMatch[2];
