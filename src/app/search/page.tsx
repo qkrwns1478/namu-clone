@@ -1,4 +1,3 @@
-// app/search/page.tsx
 import { searchDocs } from '@/app/actions'
 import Link from 'next/link'
 

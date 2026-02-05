@@ -1,4 +1,3 @@
-// app/actions.ts
 'use server'
 
 import { PrismaClient } from '@prisma/client'
@@ -12,10 +11,14 @@ const prisma = new PrismaClient()
 
 // 문서 조회
 export async function getWikiPage(slug: string) {
-  // URL 디코딩 (한글 지원)
   const decodedSlug = decodeURIComponent(slug)
   return await prisma.wikiPage.findUnique({
     where: { slug: decodedSlug },
+    include: {
+      categories: {
+        include: { category: true }
+      }
+    }
   })
 }
 
@@ -28,6 +31,7 @@ export async function getRecentChanges() {
   })
 }
 
+// 문서 히스토리
 export async function getWikiHistory(slug: string) {
   const decodedSlug = decodeURIComponent(slug)
   return await prisma.wikiRevision.findMany({
@@ -38,11 +42,11 @@ export async function getWikiHistory(slug: string) {
   })
 }
 
-// 문서 저장 (트랜잭션 처리)
+// 문서 저장
 export async function saveWikiPage(formData: FormData) {
   const slug = formData.get('slug') as string
   const content = formData.get('content') as string
-  const comment = formData.get('comment') as string // 수정 코멘트
+  const comment = formData.get('comment') as string
 
   if (!slug || !content) return
 
@@ -92,7 +96,6 @@ export async function saveWikiPage(formData: FormData) {
 
       // 5. 리비전 저장 (기존 코드)
       await tx.wikiRevision.create({
-         // ... 기존 데이터 ...
           data: {
           content,
           comment: comment || '문서 수정',
@@ -136,9 +139,6 @@ export async function revertWikiPage(slug: string, revisionId: number) {
   if (!oldRevision) throw new Error("리비전을 찾을 수 없습니다.")
 
   // 2. 현재 문서를 과거 내용으로 업데이트 (새로운 리비전 생성 포함)
-  // 기존 saveWikiPage 로직을 재활용하거나 트랜잭션을 새로 짭니다.
-  // 여기서는 직접 트랜잭션 구현:
-  
   await prisma.$transaction(async (tx) => {
     // 페이지 본문 업데이트
     const page = await tx.wikiPage.update({

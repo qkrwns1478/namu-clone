@@ -2,7 +2,7 @@ import { getWikiPage, saveWikiPage } from '@/app/actions'
 import ImageUploader from '@/components/ImageUploader'
 
 export default async function EditPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params // await 추가
+  const { slug } = await params
   const decodedSlug = decodeURIComponent(slug)
   const page = await getWikiPage(slug)
 

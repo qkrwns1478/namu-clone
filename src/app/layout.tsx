@@ -1,44 +1,31 @@
-// app/layout.tsx
 import './globals.css'
-import Link from 'next/link'
-import { getRecentChanges } from './actions'
-import SearchForm from '@/components/SearchForm'
+import Header from '@/components/Header'
+import RightSidebar from '@/components/RightSidebar'
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const recentChanges = await getRecentChanges()
-
   return (
     <html lang="ko">
-      <body className="bg-gray-100 flex min-h-screen">
-        {/* 메인 콘텐츠 */}
-        <main className="flex-1 p-6 max-w-4xl mx-auto bg-white shadow-sm min-h-screen">
+      <body className="pt-[60px] pb-10">
+        <Header />
+        
+        <div className="max-w-[1300px] mx-auto px-2 sm:px-4 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 mt-4">
+          {/* 메인 콘텐츠 영역 */}
+          <main className="min-w-0">
             {children}
-        </main>
+          </main>
 
-        {/* 우측 사이드바 (나무위키 스타일) */}
-        <aside className="w-64 bg-white border-l p-4 hidden lg:block text-sm">
-          <div className="mb-4">
-            <Link href="/" className="text-xl font-bold text-[#00A495]">namu.wiki clone</Link>
-            <SearchForm />
-          </div>
-          <h3 className="font-bold mb-2 text-gray-700">최근 변경내역</h3>
-          <ul>
-            {recentChanges.map((page) => (
-              <li key={page.slug} className="border-b py-1 truncate">
-                <Link href={`/w/${page.slug}`} className="hover:underline">
-                  {page.slug}
-                </Link>
-                <span className="text-xs text-gray-400 block">
-                  {page.updatedAt.toLocaleTimeString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </aside>
+          {/* 우측 사이드바 */}
+          <RightSidebar />
+        </div>
+        
+        {/* 푸터 */}
+        <footer className="mt-10 py-8 text-center text-xs text-gray-500 border-t">
+          <p>Powered by Next.js & Prisma (Clone Project)</p>
+        </footer>
       </body>
     </html>
   )
