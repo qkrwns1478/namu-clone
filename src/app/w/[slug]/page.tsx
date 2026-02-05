@@ -2,7 +2,7 @@ import { getWikiPage, getCategoryDocs } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
-import { Star, Edit, MessageSquare, History, MoreVertical } from "lucide-react";
+import { Star, MoreVertical } from "lucide-react";
 import { FaMessage, FaBook } from "react-icons/fa6";
 import { FaEdit } from "react-icons/fa";
 import { Metadata } from "next";
@@ -20,7 +20,6 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-// 탭 제목 변경을 위한 동적 메타데이터 생성
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const decodedSlug = decodeURIComponent(slug);
@@ -98,7 +97,7 @@ export default async function WikiPage({ params }: Props) {
               <FaBook size={14} /> 역사
             </Link>
           </div>
-          <button className={btnToolClass}>
+          <button className={btnToolClass} title="더보기">
             <MoreVertical size={16} />
           </button>
         </div>

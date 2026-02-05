@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getRecentChanges } from '@/app/actions'
 import { ChevronRight } from 'lucide-react'
-import { IoIosPodium } from "react-icons/io";
+import { IoPodium } from "react-icons/io5";
 import { TbClockEdit } from "react-icons/tb";
 
 export default async function RightSidebar() {
@@ -12,7 +12,7 @@ export default async function RightSidebar() {
       {/* 실시간 검색어 */}
       <div className="px-5 py-4 bg-white border border-[#ccc] rounded rounded-md">
         <div className="mb-3 font-bold text-sm text-gray-700 flex gap-2 justify-start items-center">
-          <IoIosPodium size={16} color='#21252980' />
+          <IoPodium size={16} color='#21252980' />
           <span>실시간 검색어</span>
         </div>
         <div className="text-center text-sm text-gray-400">

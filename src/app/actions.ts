@@ -199,3 +199,87 @@ export async function getCategoryDocs(categoryName: string) {
   if (!category) return []
   return category.pages
 }
+
+// 문서 이동 (이름 변경)
+export async function moveWikiPage(prevState: any, formData: FormData) {
+  const oldSlug = formData.get('oldSlug') as string
+  const newSlug = formData.get('newSlug') as string
+  const comment = formData.get('comment') as string
+
+  if (!oldSlug || !newSlug) {
+    return { success: false, message: '문서 제목을 입력해주세요.' }
+  }
+
+  // 1. 이동하려는 제목의 문서가 이미 존재하는지 확인
+  const existingPage = await prisma.wikiPage.findUnique({
+    where: { slug: newSlug }
+  })
+
+  if (existingPage) {
+    return { success: false, message: '이미 존재하는 문서 이름입니다.' }
+  }
+
+  const headerList = await headers() 
+  const ip = headerList.get('x-forwarded-for') || '127.0.0.1'
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 2. 페이지 슬러그 업데이트 (이름 변경)
+      const page = await tx.wikiPage.update({
+        where: { slug: oldSlug },
+        data: { slug: newSlug }
+      })
+
+      // 3. 이동 기록 남기기 (리비전 생성)
+      await tx.wikiRevision.create({
+        data: {
+          pageId: page.id,
+          content: page.content, // 내용은 그대로
+          comment: `(문서 이동) ${oldSlug} → ${newSlug} ${comment ? `: ${comment}` : ''}`,
+          ipAddress: ip,
+        }
+      })
+    })
+  } catch (error) {
+    console.error(error)
+    return { success: false, message: '문서 이동 중 오류가 발생했습니다.' }
+  }
+
+  // 캐시 갱신 및 리다이렉트
+  revalidatePath(`/w/${oldSlug}`)
+  redirect(`/w/${encodeURIComponent(newSlug)}`)
+}
+
+// 문서 삭제
+export async function deleteWikiPage(formData: FormData) {
+  const slug = formData.get('slug') as string
+  const comment = formData.get('comment') as string
+
+  if (!slug) return
+
+  const headerList = await headers() 
+  const ip = headerList.get('x-forwarded-for') || '127.0.0.1'
+
+  try {
+    // 나무위키 방식: DB에서 완전 삭제보다는 '내용 비우기' 또는 '삭제 기록 남기기'가 일반적이지만,
+    // 여기서는 요청하신 대로 '삭제' 기능을 구현하되, Prisma Schema 설정에 따라 동작이 다를 수 있습니다.
+    // (Cascade Delete가 설정되어 있다면 WikiPage 삭제 시 하위 Revision도 삭제됨)
+    
+    // 여기서는 안전하게 '삭제되었습니다' 라는 내용으로 덮어쓰거나, 
+    // 레코드를 아예 지우는 방식 중 **레코드를 삭제**하는 방식으로 구현합니다.
+    
+    await prisma.wikiPage.delete({
+      where: { slug }
+    })
+    
+    // 만약 로그를 남겨야 한다면 별도의 Log 테이블이 필요합니다. 
+    // 현재 구조에서는 페이지가 사라지면 리비전을 남길 수 없으므로 바로 삭제합니다.
+
+  } catch (error) {
+    console.error("Delete failed:", error)
+    // 에러 처리 로직 (필요 시)
+    return
+  }
+
+  redirect('/')
+}
