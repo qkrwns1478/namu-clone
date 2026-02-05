@@ -223,30 +223,40 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
   // 4. 인라인 파서
   const parseInline = (text: string): React.ReactNode[] => {
-    // [1] 각 문법의 매치 지점을 미리 찾습니다.
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
 
-    const braceIdx = text.indexOf("{{{");
+    const braceIdx = text.indexOf("{{{"); // Brace는 중첩 처리를 위해 index만 확인
 
     const youtubeRegex = /\[youtube\((.*?)\)\]/i;
     const youtubeMatch = youtubeRegex.exec(text);
 
     const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
     const wikiMatch = wikiRegex.exec(text);
+    
+    const boldRegex = /'''(.*?)'''/;
+    const boldMatch = boldRegex.exec(text);
+
+    const underlineRegex = /__(.*?)__/;
+    const underlineMatch = underlineRegex.exec(text);
+
+    const delRegex = /~~(.*?)~~/;
+    const delMatch = delRegex.exec(text);
 
     // [2] 우선순위 결정을 위한 후보군 생성 (인덱스 오름차순 정렬)
-    // 인덱스가 -1이거나 매치가 없으면 Infinity로 설정하여 후순위로 밀어냄
     const candidates = [
       { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
       { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
       { type: "youtube", idx: youtubeMatch ? youtubeMatch.index : Infinity, match: youtubeMatch },
       { type: "wiki", idx: wikiMatch ? wikiMatch.index : Infinity, match: wikiMatch },
+      { type: "bold", idx: boldMatch ? boldMatch.index : Infinity, match: boldMatch },
+      { type: "underline", idx: underlineMatch ? underlineMatch.index : Infinity, match: underlineMatch },
+      { type: "del", idx: delMatch ? delMatch.index : Infinity, match: delMatch },
     ].sort((a, b) => a.idx - b.idx);
 
-    // [3] 가장 먼저 등장하는 문법부터 순차적으로 처리 시도
+    // [3] 가장 먼저 등장하는 문법부터 순차적으로 처리
     for (const candidate of candidates) {
-      if (candidate.idx === Infinity) break; // 더 이상 매치되는 문법 없음
+      if (candidate.idx === Infinity) break;
 
       // --- [각주 파서] ---
       if (candidate.type === "note" && candidate.match) {
@@ -254,8 +264,8 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         const before = text.slice(0, match.index);
         const noteContentRaw = match[1];
         const after = text.slice(match.index + match[0].length);
-
         const parsedNoteContent = parseInline(noteContentRaw);
+
         footnotes.push(<span key={getKey("fn-content")}>{parsedNoteContent}</span>);
         const noteId = footnotes.length;
 
@@ -270,7 +280,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       if (candidate.type === "brace") {
         let depth = 0;
         let endIdx = -1;
-        // braceIdx(candidate.idx)부터 시작해서 닫는 괄호 탐색
         for (let i = candidate.idx; i < text.length; i++) {
           if (text.startsWith("{{{", i)) {
             depth++;
@@ -290,26 +299,21 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           const rawContent = text.slice(candidate.idx + 3, endIdx);
           const after = text.slice(endIdx + 3);
 
-          // 1. 색상 파싱
+          // 1. 색상
           if (rawContent.trim().startsWith("#")) {
             const spaceIdx = rawContent.indexOf(" ");
             let colorDef = "";
             let innerContent = "";
-
             if (spaceIdx !== -1) {
               colorDef = rawContent.slice(0, spaceIdx);
               innerContent = rawContent.slice(spaceIdx + 1);
             } else {
               colorDef = rawContent;
-              innerContent = "";
             }
-
             let colorVal = colorDef.split(",")[0].trim();
-            if (colorVal === "#transparent") {
-              colorVal = "transparent";
-            } else if (colorVal.startsWith("#")) {
-              const isHex = /^#[0-9A-Fa-f]{3,8}$/.test(colorVal);
-              if (!isHex) colorVal = colorVal.substring(1);
+            if (colorVal === "#transparent") colorVal = "transparent";
+            else if (colorVal.startsWith("#") && !/^#[0-9A-Fa-f]{3,8}$/.test(colorVal)) {
+              colorVal = colorVal.substring(1);
             }
 
             return [
@@ -321,7 +325,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             ];
           }
 
-          // 2. 텍스트 크기 파싱
+          // 2. 텍스트 크기
           const sizeMatch = rawContent.match(/^\s*([+-])([1-5])\s+([\s\S]*)$/);
           if (sizeMatch) {
             const sign = sizeMatch[1];
@@ -333,7 +337,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
               "-2": "0.83333em", "-3": "0.74067em", "-4": "0.64811em", "-5": "0.62222em",
             };
             const targetSize = sizeMapping[`${sign}${level}`] || "1em";
-
             return [
               ...parseInline(before),
               <span key={getKey("size")} style={{ fontSize: targetSize }}>
@@ -343,13 +346,13 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             ];
           }
 
+          // 일반 텍스트
           return [
             ...parseInline(before),
             ...parseInline(rawContent),
             ...parseInline(after),
           ];
         }
-        // endIdx를 못 찾았으면 (닫는 괄호 없음), 루프를 계속 돌며 다음 우선순위 파서를 찾습니다.
       }
 
       // --- [유튜브 파서] ---
@@ -358,16 +361,14 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         const before = text.slice(0, match.index);
         const argsRaw = match[1];
         const after = text.slice(match.index + match[0].length);
-
         const args = argsRaw.split(",");
         const videoId = args[0].trim();
         let width = "640px";
         let height = "360px";
-
         for (let i = 1; i < args.length; i++) {
-          const arg = args[i].trim();
-          if (arg.startsWith("width=")) width = arg.split("=")[1];
-          if (arg.startsWith("height=")) height = arg.split("=")[1];
+            const arg = args[i].trim();
+            if (arg.startsWith("width=")) width = arg.split("=")[1];
+            if (arg.startsWith("height=")) height = arg.split("=")[1];
         }
 
         return [
@@ -379,9 +380,8 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
               src={`https://www.youtube.com/embed/${videoId}`}
               title="YouTube video player"
               frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              style={{ maxWidth: "100%", width: width, height: height }}
+              style={{ maxWidth: "100%", width, height }}
               className="border-0"
             />
           </div>,
@@ -389,7 +389,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         ];
       }
 
-      // --- [통합 위키 문법] ---
+      // --- [위키 링크 파서] ---
       if (candidate.type === "wiki" && candidate.match) {
         const match = candidate.match;
         const before = text.slice(0, match.index);
@@ -410,7 +410,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         const target = splitIndex !== -1 ? rawContent.slice(0, splitIndex) : rawContent;
         const optionsRaw = splitIndex !== -1 ? rawContent.slice(splitIndex + 1) : "";
 
-        // 이미지 처리
         if (/^(파일|File|이미지):/i.test(target)) {
           const filename = target.split(":")[1];
           const options = optionsRaw.split("|");
@@ -425,15 +424,14 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           return [
             ...parseInline(before),
             <span key={getKey("file")} className="inline-block align-middle">
-              <img src={`/uploads/${filename}`} alt={filename} style={{ width: width }} className="max-w-full h-auto" />
+              <img src={`/uploads/${filename}`} alt={filename} style={{ width }} className="max-w-full h-auto" />
             </span>,
             ...parseInline(after),
           ];
         }
 
         const isExternal = /^https?:\/\//i.test(target);
-        // 라벨이 있으면 라벨 파싱, 없으면 타겟 자체 사용
-        const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target];
+        const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target]; // 라벨 내부도 재귀 파싱
 
         if (isExternal) {
           const hasImageInLabel = /\[\[(?:파일|File|이미지):/i.test(optionsRaw);
@@ -456,24 +454,22 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             ...parseInline(after),
           ];
         } else {
-          // [내부 링크 처리 - 앵커 분리 로직 적용]
+          // [내부 링크 & 앵커 분리]
           const hashIndex = target.indexOf("#");
           let targetSlug = target;
           let anchor = "";
-  
           if (hashIndex !== -1) {
             targetSlug = target.substring(0, hashIndex);
-            anchor = target.substring(hashIndex); // #s-6 등 유지
+            anchor = target.substring(hashIndex);
           }
-  
+
           const isExist = existingSet.has(targetSlug);
           const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
-  
+
           return [
             ...parseInline(before),
             <Link
               key={getKey("int-link")}
-              // 문서는 인코딩하고 앵커는 그대로 붙임
               href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
               className={`${linkColor} hover:!underline`}
             >
@@ -483,41 +479,43 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           ];
         }
       }
+
+      // --- [스타일 파서 (Bold, Underline, Del)] ---
+      // 이들이 candidates에 포함됨으로써, '''[[...]]''' 같은 경우 '''가 먼저 잡혀서 처리됨
+      
+      if (candidate.type === "bold" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const inner = match[1];
+        const after = text.slice(match.index + match[0].length);
+        // inner도 parseInline을 통해 내부의 링크 등을 처리
+        return [...parseInline(before), <b key={getKey("bold")}>{parseInline(inner)}</b>, ...parseInline(after)];
+      }
+
+      if (candidate.type === "underline" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const inner = match[1];
+        const after = text.slice(match.index + match[0].length);
+        return [...parseInline(before), <u key={getKey("underline")}>{parseInline(inner)}</u>, ...parseInline(after)];
+      }
+
+      if (candidate.type === "del" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const inner = match[1];
+        const after = text.slice(match.index + match[0].length);
+        return [
+          ...parseInline(before),
+          <del key={getKey("del")} className="text-gray-400">
+            {parseInline(inner)}
+          </del>,
+          ...parseInline(after),
+        ];
+      }
     }
 
-    const boldRegex = /'''(.*?)'''/;
-    const boldMatch = boldRegex.exec(text);
-    if (boldMatch) {
-      const before = text.slice(0, boldMatch.index);
-      const inner = boldMatch[1];
-      const after = text.slice(boldMatch.index + boldMatch[0].length);
-      return [...parseInline(before), <b key={getKey("bold")}>{inner}</b>, ...parseInline(after)];
-    }
-
-    const underlineRegex = /__(.*?)__/;
-    const underlineMatch = underlineRegex.exec(text);
-    if (underlineMatch) {
-      const before = text.slice(0, underlineMatch.index);
-      const inner = underlineMatch[1];
-      const after = text.slice(underlineMatch.index + underlineMatch[0].length);
-      return [...parseInline(before), <u key={getKey("underline")}>{inner}</u>, ...parseInline(after)];
-    }
-
-    const delRegex = /~~(.*?)~~/;
-    const delMatch = delRegex.exec(text);
-    if (delMatch) {
-      const before = text.slice(0, delMatch.index);
-      const inner = delMatch[1];
-      const after = text.slice(delMatch.index + delMatch[0].length);
-      return [
-        ...parseInline(before),
-        <del key={getKey("del")} className="text-gray-400">
-          {inner}
-        </del>,
-        ...parseInline(after),
-      ];
-    }
-
+    // 아무런 패턴도 매칭되지 않으면 텍스트 반환
     return [text];
   };
 
