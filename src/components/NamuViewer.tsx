@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { IoLink } from "react-icons/io5";
 
 // 목차 아이템 타입
 type TocItem = {
@@ -267,6 +268,8 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target];
 
       if (isExternal) {
+        const hasImageInLabel = /\[\[(?:파일|File|이미지):/i.test(optionsRaw);
+
         return [
           ...parseInline(before),
           <a
@@ -274,8 +277,13 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             href={target}
             target="_blank"
             rel="noreferrer"
-            className="text-[#0275d8] hover:!underline inline-flex items-center gap-0.5"
+            className="text-[#090] hover:!underline inline-flex items-center gap-1"
           >
+            {!hasImageInLabel && (
+              <span className="inline-flex items-center justify-center bg-[#008000] text-white p-[2px] text-[14.4px] shrink-0">
+                <IoLink size={12} />
+              </span>
+            )}
             {labelNodes}
           </a>,
           ...parseInline(after),
