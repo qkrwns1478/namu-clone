@@ -223,268 +223,265 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
   // 4. 인라인 파서
   const parseInline = (text: string): React.ReactNode[] => {
-    // [각주 파싱]
+    // [1] 각 문법의 매치 지점을 미리 찾습니다.
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
-    if (noteMatch) {
-      const before = text.slice(0, noteMatch.index);
-      const noteContentRaw = noteMatch[1];
-      const after = text.slice(noteMatch.index + noteMatch[0].length);
 
-      const parsedNoteContent = parseInline(noteContentRaw);
-
-      footnotes.push(<span key={getKey("fn-content")}>{parsedNoteContent}</span>);
-      const noteId = footnotes.length;
-
-      return [
-        ...parseInline(before),
-        <FootnoteRef key={getKey("fn-ref")} id={noteId} content={parsedNoteContent} />,
-        ...parseInline(after),
-      ];
-    }
-
-    // [통합 {{{...}}} 파서: 색상 및 크기 및 중첩 지원]
     const braceIdx = text.indexOf("{{{");
-    if (braceIdx !== -1) {
-      let depth = 0;
-      let endIdx = -1;
 
-      for (let i = braceIdx; i < text.length; i++) {
-        if (text.startsWith("{{{", i)) {
-          depth++;
-          i += 2;
-        } else if (text.startsWith("}}}", i)) {
-          depth--;
-          if (depth === 0) {
-            endIdx = i;
-            break;
-          }
-          i += 2;
-        }
-      }
-
-      if (endIdx !== -1) {
-        const before = text.slice(0, braceIdx);
-        const rawContent = text.slice(braceIdx + 3, endIdx); // {{{ 와 }}} 사이의 내용
-        const after = text.slice(endIdx + 3);
-
-        // 1. 색상 파싱: #으로 시작
-        if (rawContent.trim().startsWith("#")) {
-          // 문법: {{{#color 텍스트}}}
-          // 텍스트와 색상 구분 (첫 번째 공백 기준)
-          const spaceIdx = rawContent.indexOf(" ");
-          let colorDef = "";
-          let innerContent = "";
-
-          if (spaceIdx !== -1) {
-            colorDef = rawContent.slice(0, spaceIdx);
-            innerContent = rawContent.slice(spaceIdx + 1);
-          } else {
-            colorDef = rawContent;
-            innerContent = ""; // 텍스트가 없는 경우
-          }
-
-          // 색상 값 처리
-          // 1) 콤마가 있으면 첫 번째 것만 사용 (#888,#ff0 -> #888)
-          let colorVal = colorDef.split(",")[0].trim();
-          
-          // 2) #transparent 처리
-          if (colorVal === "#transparent") {
-            colorVal = "transparent";
-          } else if (colorVal.startsWith("#")) {
-            // 3) #red 처럼 HTML 색상 이름에 #이 붙은 경우 # 제거 (Hex 코드가 아닌 경우)
-            // 간단한 Hex 검증 (3~8자리 16진수)
-            const isHex = /^#[0-9A-Fa-f]{3,8}$/.test(colorVal);
-            if (!isHex) {
-              colorVal = colorVal.substring(1); // #red -> red
-            }
-          }
-
-          return [
-            ...parseInline(before),
-            <span key={getKey("color")} style={{ color: colorVal }}>
-              {parseInline(innerContent)}
-            </span>,
-            ...parseInline(after),
-          ];
-        }
-
-        // 2. 텍스트 크기 파싱: +1 ~ +5 / -1 ~ -5
-        const sizeMatch = rawContent.match(/^\s*([+-])([1-5])\s+([\s\S]*)$/);
-        if (sizeMatch) {
-          const sign = sizeMatch[1];
-          const level = sizeMatch[2];
-          const innerContent = sizeMatch[3];
-
-          const sizeMapping: { [key: string]: string } = {
-            "+1": "1.28889em",
-            "+2": "1.38889em",
-            "+3": "1.48144em",
-            "+4": "1.57400em",
-            "+5": "1.66667em",
-            "-1": "0.92589em",
-            "-2": "0.83333em",
-            "-3": "0.74067em",
-            "-4": "0.64811em",
-            "-5": "0.62222em",
-          };
-          const targetSize = sizeMapping[`${sign}${level}`] || "1em";
-
-          return [
-            ...parseInline(before),
-            <span key={getKey("size")} style={{ fontSize: targetSize }}>
-              {parseInline(innerContent)}
-            </span>,
-            ...parseInline(after),
-          ];
-        }
-        
-        // 문법에 맞지 않는 {{{...}}}는 내부만 파싱해서 반환 (혹은 원문 유지)
-        return [
-          ...parseInline(before),
-          ...parseInline(rawContent),
-          ...parseInline(after)
-        ];
-      }
-    }
-
-    // 유튜브 파서 [youtube(ID)]
     const youtubeRegex = /\[youtube\((.*?)\)\]/i;
     const youtubeMatch = youtubeRegex.exec(text);
 
-    if (youtubeMatch) {
-      const before = text.slice(0, youtubeMatch.index);
-      const argsRaw = youtubeMatch[1];
-      const after = text.slice(youtubeMatch.index + youtubeMatch[0].length);
-
-      const args = argsRaw.split(",");
-      const videoId = args[0].trim();
-      
-      let width = "640px";
-      let height = "360px";
-      
-      for (let i = 1; i < args.length; i++) {
-        const arg = args[i].trim();
-        if (arg.startsWith("width=")) width = arg.split("=")[1];
-        if (arg.startsWith("height=")) height = arg.split("=")[1];
-      }
-
-      return [
-        ...parseInline(before),
-        <div key={getKey("youtube")} className="block max-w-full">
-          <iframe
-            width={width.replace("px", "")}
-            height={height.replace("px", "")}
-            src={`https://www.youtube.com/embed/${videoId}`}
-            title="YouTube video player"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            style={{ maxWidth: "100%", width: width, height: height }}
-            className="border-0"
-          />
-        </div>,
-        ...parseInline(after),
-      ];
-    }
-
-    // [통합 위키 문법]
     const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
-    const match = wikiRegex.exec(text);
+    const wikiMatch = wikiRegex.exec(text);
 
-    if (match) {
-      const before = text.slice(0, match.index);
-      const rawContent = match[1];
-      const after = text.slice(match.index + match[0].length);
+    // [2] 우선순위 결정을 위한 후보군 생성 (인덱스 오름차순 정렬)
+    // 인덱스가 -1이거나 매치가 없으면 Infinity로 설정하여 후순위로 밀어냄
+    const candidates = [
+      { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
+      { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
+      { type: "youtube", idx: youtubeMatch ? youtubeMatch.index : Infinity, match: youtubeMatch },
+      { type: "wiki", idx: wikiMatch ? wikiMatch.index : Infinity, match: wikiMatch },
+    ].sort((a, b) => a.idx - b.idx);
 
-      let splitIndex = -1;
-      let depth = 0;
-      for (let i = 0; i < rawContent.length; i++) {
-        if (rawContent[i] === "[") depth++;
-        else if (rawContent[i] === "]") depth--;
-        else if (rawContent[i] === "|" && depth === 0) {
-          splitIndex = i;
-          break;
-        }
+    // [3] 가장 먼저 등장하는 문법부터 순차적으로 처리 시도
+    for (const candidate of candidates) {
+      if (candidate.idx === Infinity) break; // 더 이상 매치되는 문법 없음
+
+      // --- [각주 파서] ---
+      if (candidate.type === "note" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const noteContentRaw = match[1];
+        const after = text.slice(match.index + match[0].length);
+
+        const parsedNoteContent = parseInline(noteContentRaw);
+        footnotes.push(<span key={getKey("fn-content")}>{parsedNoteContent}</span>);
+        const noteId = footnotes.length;
+
+        return [
+          ...parseInline(before),
+          <FootnoteRef key={getKey("fn-ref")} id={noteId} content={parsedNoteContent} />,
+          ...parseInline(after),
+        ];
       }
 
-      const target = splitIndex !== -1 ? rawContent.slice(0, splitIndex) : rawContent;
-      const optionsRaw = splitIndex !== -1 ? rawContent.slice(splitIndex + 1) : "";
-
-      if (/^(파일|File|이미지):/i.test(target)) {
-        const filename = target.split(":")[1];
-        const options = optionsRaw.split("|");
-        let width: string | undefined = undefined;
-        options.forEach((opt) => {
-          const trimmed = opt.trim();
-          if (trimmed.startsWith("width=")) {
-            const val = trimmed.split("=")[1];
-            width = /^\d+$/.test(val) ? `${val}px` : val;
+      // --- [통합 {{{...}}} 파서] ---
+      if (candidate.type === "brace") {
+        let depth = 0;
+        let endIdx = -1;
+        // braceIdx(candidate.idx)부터 시작해서 닫는 괄호 탐색
+        for (let i = candidate.idx; i < text.length; i++) {
+          if (text.startsWith("{{{", i)) {
+            depth++;
+            i += 2;
+          } else if (text.startsWith("}}}", i)) {
+            depth--;
+            if (depth === 0) {
+              endIdx = i;
+              break;
+            }
+            i += 2;
           }
-        });
+        }
+
+        if (endIdx !== -1) {
+          const before = text.slice(0, candidate.idx);
+          const rawContent = text.slice(candidate.idx + 3, endIdx);
+          const after = text.slice(endIdx + 3);
+
+          // 1. 색상 파싱
+          if (rawContent.trim().startsWith("#")) {
+            const spaceIdx = rawContent.indexOf(" ");
+            let colorDef = "";
+            let innerContent = "";
+
+            if (spaceIdx !== -1) {
+              colorDef = rawContent.slice(0, spaceIdx);
+              innerContent = rawContent.slice(spaceIdx + 1);
+            } else {
+              colorDef = rawContent;
+              innerContent = "";
+            }
+
+            let colorVal = colorDef.split(",")[0].trim();
+            if (colorVal === "#transparent") {
+              colorVal = "transparent";
+            } else if (colorVal.startsWith("#")) {
+              const isHex = /^#[0-9A-Fa-f]{3,8}$/.test(colorVal);
+              if (!isHex) colorVal = colorVal.substring(1);
+            }
+
+            return [
+              ...parseInline(before),
+              <span key={getKey("color")} style={{ color: colorVal }}>
+                {parseInline(innerContent)}
+              </span>,
+              ...parseInline(after),
+            ];
+          }
+
+          // 2. 텍스트 크기 파싱
+          const sizeMatch = rawContent.match(/^\s*([+-])([1-5])\s+([\s\S]*)$/);
+          if (sizeMatch) {
+            const sign = sizeMatch[1];
+            const level = sizeMatch[2];
+            const innerContent = sizeMatch[3];
+            const sizeMapping: { [key: string]: string } = {
+              "+1": "1.28889em", "+2": "1.38889em", "+3": "1.48144em",
+              "+4": "1.57400em", "+5": "1.66667em", "-1": "0.92589em",
+              "-2": "0.83333em", "-3": "0.74067em", "-4": "0.64811em", "-5": "0.62222em",
+            };
+            const targetSize = sizeMapping[`${sign}${level}`] || "1em";
+
+            return [
+              ...parseInline(before),
+              <span key={getKey("size")} style={{ fontSize: targetSize }}>
+                {parseInline(innerContent)}
+              </span>,
+              ...parseInline(after),
+            ];
+          }
+
+          return [
+            ...parseInline(before),
+            ...parseInline(rawContent),
+            ...parseInline(after),
+          ];
+        }
+        // endIdx를 못 찾았으면 (닫는 괄호 없음), 루프를 계속 돌며 다음 우선순위 파서를 찾습니다.
+      }
+
+      // --- [유튜브 파서] ---
+      if (candidate.type === "youtube" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const argsRaw = match[1];
+        const after = text.slice(match.index + match[0].length);
+
+        const args = argsRaw.split(",");
+        const videoId = args[0].trim();
+        let width = "640px";
+        let height = "360px";
+
+        for (let i = 1; i < args.length; i++) {
+          const arg = args[i].trim();
+          if (arg.startsWith("width=")) width = arg.split("=")[1];
+          if (arg.startsWith("height=")) height = arg.split("=")[1];
+        }
 
         return [
           ...parseInline(before),
-          <span key={getKey("file")} className="inline-block align-middle">
-            <img
-              src={`/uploads/${filename}`}
-              alt={filename}
-              style={{ width: width }}
-              className="max-w-full h-auto"
+          <div key={getKey("youtube")} className="block max-w-full">
+            <iframe
+              width={width.replace("px", "")}
+              height={height.replace("px", "")}
+              src={`https://www.youtube.com/embed/${videoId}`}
+              title="YouTube video player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ maxWidth: "100%", width: width, height: height }}
+              className="border-0"
             />
-          </span>,
+          </div>,
           ...parseInline(after),
         ];
       }
 
-      const isExternal = /^https?:\/\//i.test(target);
-      const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target];
+      // --- [통합 위키 문법] ---
+      if (candidate.type === "wiki" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const rawContent = match[1];
+        const after = text.slice(match.index + match[0].length);
 
-      if (isExternal) {
-        const hasImageInLabel = /\[\[(?:파일|File|이미지):/i.test(optionsRaw);
-
-        return [
-          ...parseInline(before),
-          <a
-            key={getKey("ext-link")}
-            href={target}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[#090] hover:!underline inline-flex items-center gap-1"
-          >
-            {!hasImageInLabel && (
-              <span className="inline-flex items-center justify-center bg-[#008000] text-white p-[2px] text-[15px] shrink-0">
-                <IoLink size={12} />
-              </span>
-            )}
-            {labelNodes}
-          </a>,
-          ...parseInline(after),
-        ];
-      } else {
-        const hashIndex = target.indexOf("#");
-        let targetSlug = target;
-        let anchor = "";
-
-        if (hashIndex !== -1) {
-          targetSlug = target.substring(0, hashIndex);
-          anchor = target.substring(hashIndex);
+        let splitIndex = -1;
+        let depth = 0;
+        for (let i = 0; i < rawContent.length; i++) {
+          if (rawContent[i] === "[") depth++;
+          else if (rawContent[i] === "]") depth--;
+          else if (rawContent[i] === "|" && depth === 0) {
+            splitIndex = i;
+            break;
+          }
         }
 
-        const isExist = existingSet.has(targetSlug);
-        const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
+        const target = splitIndex !== -1 ? rawContent.slice(0, splitIndex) : rawContent;
+        const optionsRaw = splitIndex !== -1 ? rawContent.slice(splitIndex + 1) : "";
 
-        return [
-          ...parseInline(before),
-          <Link
-            key={getKey("int-link")}
-            href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
-            className={`${linkColor} hover:!underline`}
-          >
-            {labelNodes}
-          </Link>,
-          ...parseInline(after),
-        ];
+        // 이미지 처리
+        if (/^(파일|File|이미지):/i.test(target)) {
+          const filename = target.split(":")[1];
+          const options = optionsRaw.split("|");
+          let width: string | undefined = undefined;
+          options.forEach((opt) => {
+            const trimmed = opt.trim();
+            if (trimmed.startsWith("width=")) {
+              const val = trimmed.split("=")[1];
+              width = /^\d+$/.test(val) ? `${val}px` : val;
+            }
+          });
+          return [
+            ...parseInline(before),
+            <span key={getKey("file")} className="inline-block align-middle">
+              <img src={`/uploads/${filename}`} alt={filename} style={{ width: width }} className="max-w-full h-auto" />
+            </span>,
+            ...parseInline(after),
+          ];
+        }
+
+        const isExternal = /^https?:\/\//i.test(target);
+        // 라벨이 있으면 라벨 파싱, 없으면 타겟 자체 사용
+        const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target];
+
+        if (isExternal) {
+          const hasImageInLabel = /\[\[(?:파일|File|이미지):/i.test(optionsRaw);
+          return [
+            ...parseInline(before),
+            <a
+              key={getKey("ext-link")}
+              href={target}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#090] hover:!underline inline-flex items-center gap-1"
+            >
+              {!hasImageInLabel && (
+                <span className="inline-flex items-center justify-center bg-[#008000] text-white p-[2px] text-[15px] shrink-0">
+                  <IoLink size={12} />
+                </span>
+              )}
+              {labelNodes}
+            </a>,
+            ...parseInline(after),
+          ];
+        } else {
+          // [내부 링크 처리 - 앵커 분리 로직 적용]
+          const hashIndex = target.indexOf("#");
+          let targetSlug = target;
+          let anchor = "";
+  
+          if (hashIndex !== -1) {
+            targetSlug = target.substring(0, hashIndex);
+            anchor = target.substring(hashIndex); // #s-6 등 유지
+          }
+  
+          const isExist = existingSet.has(targetSlug);
+          const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
+  
+          return [
+            ...parseInline(before),
+            <Link
+              key={getKey("int-link")}
+              // 문서는 인코딩하고 앵커는 그대로 붙임
+              href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
+              className={`${linkColor} hover:!underline`}
+            >
+              {labelNodes}
+            </Link>,
+            ...parseInline(after),
+          ];
+        }
       }
     }
 
@@ -497,18 +494,13 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       return [...parseInline(before), <b key={getKey("bold")}>{inner}</b>, ...parseInline(after)];
     }
 
-    // 밑줄 파서 (__...__)
     const underlineRegex = /__(.*?)__/;
     const underlineMatch = underlineRegex.exec(text);
     if (underlineMatch) {
-        const before = text.slice(0, underlineMatch.index);
-        const inner = underlineMatch[1];
-        const after = text.slice(underlineMatch.index + underlineMatch[0].length);
-        return [
-            ...parseInline(before),
-            <u key={getKey("underline")}>{inner}</u>,
-            ...parseInline(after)
-        ];
+      const before = text.slice(0, underlineMatch.index);
+      const inner = underlineMatch[1];
+      const after = text.slice(underlineMatch.index + underlineMatch[0].length);
+      return [...parseInline(before), <u key={getKey("underline")}>{inner}</u>, ...parseInline(after)];
     }
 
     const delRegex = /~~(.*?)~~/;
