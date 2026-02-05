@@ -125,7 +125,7 @@ export default function NamuViewer({ content }: { content: string }) {
       return [
         ...parseInline(before),
         <sup key={getKey('fn-ref')} id={`r${noteId}`}>
-          <a href={`#fn${noteId}`} className="text-[#0275d8] font-bold mx-0.5 cursor-pointer" title="각주">{`[${noteId}]`}</a>
+          <a href={`#fn${noteId}`} className="text-[#0275d8] hover:!underline font-bold mx-0.5 cursor-pointer" title="각주">{`[${noteId}]`}</a>
         </sup>,
         ...parseInline(after)
       ];
@@ -171,7 +171,7 @@ export default function NamuViewer({ content }: { content: string }) {
       const after = text.slice(linkMatch.index + linkMatch[0].length);
       return [
         ...parseInline(before),
-        <Link key={getKey('link')} href={`/w/${encodeURIComponent(target)}`} className="text-[#0275d8] hover:underline">{label}</Link>,
+        <Link key={getKey('link')} href={`/w/${encodeURIComponent(target)}`} className="text-[#0275d8] hover:!underline">{label}</Link>,
         ...parseInline(after)
       ];
     }
@@ -236,7 +236,7 @@ export default function NamuViewer({ content }: { content: string }) {
             className="ml-auto flex gap-2 select-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="text-[#0275d8] text-xs cursor-pointer font-normal hover:underline">[편집]</span>
+            <span className="text-[#0275d8] text-xs cursor-pointer font-normal hover:!underline">[편집]</span>
           </div>
         </span>
       );
@@ -347,7 +347,7 @@ export default function NamuViewer({ content }: { content: string }) {
                 <li key={`fn-item-${num}`} id={`fn${num}`} className="flex gap-2 items-start">
                   <a 
                     href={`#r${num}`} 
-                    className="text-[#0275d8] shrink-0 hover:underline min-w-[20px] text-right"
+                    className="text-[#0275d8] shrink-0 hover:!underline min-w-[20px] text-right"
                     title="본문으로 이동"
                   >
                     [{num}]
