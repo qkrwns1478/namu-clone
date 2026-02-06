@@ -532,8 +532,14 @@ export default function NamuViewer({
     const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
     const wikiMatch = wikiRegex.exec(text);
 
+    const brRegex = /\[br\]/i;
+    const brMatch = brRegex.exec(text);
+
     const boldRegex = /'''(.*?)'''/;
     const boldMatch = boldRegex.exec(text);
+
+    const italicRegex = /''(.*?)''/;
+    const italicMatch = italicRegex.exec(text);
 
     const underlineRegex = /__(.*?)__/;
     const underlineMatch = underlineRegex.exec(text);
@@ -556,7 +562,9 @@ export default function NamuViewer({
       { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
       { type: "youtube", idx: youtubeMatch ? youtubeMatch.index : Infinity, match: youtubeMatch },
       { type: "wiki", idx: wikiMatch ? wikiMatch.index : Infinity, match: wikiMatch },
+      { type: "br", idx: brMatch ? brMatch.index : Infinity, match: brMatch },
       { type: "bold", idx: boldMatch ? boldMatch.index : Infinity, match: boldMatch },
+      { type: "italic", idx: italicMatch ? italicMatch.index : Infinity, match: italicMatch },
       { type: "underline", idx: underlineMatch ? underlineMatch.index : Infinity, match: underlineMatch },
       { type: "del", idx: delMatch ? delMatch.index : Infinity, match: delMatch },
       { type: "dashDel", idx: dashDelMatch ? dashDelMatch.index : Infinity, match: dashDelMatch },
@@ -580,6 +588,16 @@ export default function NamuViewer({
         return [
           ...parseInline(before),
           <FootnoteRef key={getKey("fn-ref")} id={noteId} content={parsedNoteContent} />,
+          ...parseInline(after),
+        ];
+      }
+
+      if (candidate.type === "br" && candidate.match) {
+        const before = text.slice(0, candidate.idx);
+        const after = text.slice(candidate.idx + candidate.match[0].length);
+        return [
+          ...parseInline(before),
+          <br key={getKey("br-inline")} />,
           ...parseInline(after),
         ];
       }
@@ -799,7 +817,7 @@ export default function NamuViewer({
           });
           return [
             ...parseInline(before),
-            <span key={getKey("file")} className="inline-block align-middle">
+            <span key={getKey("file")} className="flex justify-center items-center w-full align-middle">
               <img
                 src={`/uploads/${filename}`}
                 alt={filename}
@@ -870,6 +888,14 @@ export default function NamuViewer({
           <b key={getKey("bold")}>{parseInline(inner)}</b>,
           ...parseInline(after),
         ];
+      }
+
+      if (candidate.type === "italic" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const inner = match[1];
+        const after = text.slice(match.index + match[0].length);
+        return [...parseInline(before), <i key={getKey("italic")}>{parseInline(inner)}</i>, ...parseInline(after)];
       }
 
       if (candidate.type === "underline" && candidate.match) {
@@ -1366,7 +1392,7 @@ export default function NamuViewer({
       return (
         <blockquote
           key={getKey("quote")}
-          className="border-l-4 border-[#00A495] pl-4 py-1 my-2 bg-gray-50 text-gray-600"
+          className="bg-[#eee] border-2 border-dashed border-[#ccc] border-l-4 border-l-[#71bc6d] [border-left-style:solid] table my-4 p-4"
         >
           {parseInline(line.slice(1).trim())}
         </blockquote>
