@@ -127,19 +127,44 @@ export async function saveWikiPage(formData: FormData) {
 
 // 검색 기능
 export async function searchDocs(query: string) {
-  if (!query) return []
+  if (!query.trim()) return { exactMatch: null, titleMatches: [], contentMatches: [] }
   
-  return await prisma.wikiPage.findMany({
-    where: {
-      OR: [
-        { slug: { contains: query } },    // 제목에 포함
-        { content: { contains: query } }  // 내용에 포함
-      ]
-    },
-    select: { slug: true, updatedAt: true } // 필요한 필드만 가져오기
-  })
-}
+  const decodedQuery = query.trim()
 
+  // 1. 제목이 정확히 일치하는 문서
+  const exactMatch = await prisma.wikiPage.findUnique({
+    where: { slug: decodedQuery },
+    select: { slug: true, updatedAt: true, content: true }
+  })
+
+  // 2. 제목에 검색어가 포함된 문서 (정확히 일치하는 것 제외)
+  const titleMatches = await prisma.wikiPage.findMany({
+    where: {
+      slug: { 
+        contains: decodedQuery,
+        not: decodedQuery 
+      }
+    },
+    select: { slug: true, updatedAt: true, content: true },
+    orderBy: { updatedAt: 'desc' },
+    take: 15
+  })
+
+  // 3. 내용에 검색어가 포함된 문서 (제목 포함 검색 결과와 중복 방지)
+  const contentMatches = await prisma.wikiPage.findMany({
+    where: {
+      content: { contains: decodedQuery },
+      NOT: {
+        slug: { contains: decodedQuery }
+      }
+    },
+    select: { slug: true, updatedAt: true, content: true },
+    orderBy: { updatedAt: 'desc' },
+    take: 20
+  })
+
+  return { exactMatch, titleMatches, contentMatches }
+}
 // 특정 리비전으로 되돌리기
 export async function revertWikiPage(slug: string, revisionId: number) {
   // 1. 되돌리려는 과거 리비전 데이터 가져오기
