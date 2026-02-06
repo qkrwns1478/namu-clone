@@ -1292,10 +1292,10 @@ export default function NamuViewer({
       const sizes: { [key: number]: string } = {
         1: "text-3xl mt-6 mb-4 border-b-2 pb-2",
         2: "text-2xl mt-5 mb-3 border-b pb-1 font-bold",
-        3: "text-xl mt-4 mb-2 font-bold",
-        4: "text-lg mt-3 mb-1 font-bold",
-        5: "text-base mt-2 font-bold",
-        6: "text-sm mt-2 font-bold",
+        3: "text-xl mt-4 mb-2 border-b pb-1 font-bold",
+        4: "text-lg mt-3 mb-1 border-b pb-1 font-bold",
+        5: "text-base mt-2 border-b pb-1 font-bold",
+        6: "text-sm mt-2 border-b pb-1 font-bold",
       };
       const numberStr = headerMap[lineIndex];
       const id = numberStr ? `s-${numberStr.slice(0, -1)}` : undefined;
