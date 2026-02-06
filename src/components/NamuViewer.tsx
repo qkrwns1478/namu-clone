@@ -430,6 +430,49 @@ export default function NamuViewer({
         }
       }
 
+      // raw 문법 처리
+      if (l.startsWith("{{{#!raw")) {
+        let currentLineContent = l.replace(/^\{\{\{#!raw\s*/, "");
+        
+        const contentLines: string[] = [];
+        let depth = 3; 
+        let k = j;
+        let foundEnd = false;
+
+        while (k < subLines.length) {
+            let textToAnalyze = subLines[k];
+            if (k === j) textToAnalyze = currentLineContent;
+
+            const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
+            const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
+
+            depth += (openMatches * 3);
+            depth -= (closeMatches * 3);
+
+            if (depth <= 0) {
+                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+                if (contentToAdd.trim() || k !== j) {
+                  contentLines.push(contentToAdd);
+                }
+                j = k + 1;
+                foundEnd = true;
+                break;
+            }
+            
+            contentLines.push(textToAnalyze);
+            k++;
+        }
+
+        if (foundEnd) {
+            nodes.push(
+                <div key={getKey("raw-block")} className="whitespace-pre-wrap">
+                    {contentLines.join("\n")}
+                </div>
+            );
+            continue;
+        }
+      }
+
       if (l.startsWith("||")) {
         const tLines = [];
         let m = j;
@@ -574,6 +617,18 @@ export default function NamuViewer({
           const rawContent = text.slice(candidate.idx + 3, endIdx);
           const after = text.slice(endIdx + 3);
 
+          // 인라인 raw 문법 처리
+          if (rawContent.startsWith("#!raw")) {
+            const inner = rawContent.replace(/^#!raw\s?/, "");
+            return [
+              ...parseInline(before),
+              <span key={getKey("raw-inline")} className="whitespace-pre-wrap">
+                {inner}
+              </span>,
+              ...parseInline(after),
+            ];
+          }
+
           if (rawContent.startsWith("#!folding")) {
             const parts = rawContent.replace("#!folding", "").trim();
             let title = "more";
@@ -581,7 +636,7 @@ export default function NamuViewer({
 
             const titleMatch = parts.match(/^\[(.*?)\]/);
             if (titleMatch) {
-                title = titleMatch[1];
+                title = titleMatch[0];
                 foldingContent = parts.substring(titleMatch[0].length).trim();
             }
 
@@ -1333,6 +1388,48 @@ export default function NamuViewer({
     }
 
     const line = lines[i].replace(/\r$/, "").trim();
+
+    if (line.startsWith("{{{#!raw")) {
+      let currentLineContent = line.replace(/^\{\{\{#!raw\s*/, "");
+      
+      const contentLines: string[] = [];
+      let depth = 3; 
+      let k = i;
+      let foundEnd = false;
+
+      while (k < lines.length) {
+        let textToAnalyze = lines[k];
+        if (k === i) textToAnalyze = currentLineContent;
+
+        const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
+        const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
+
+        depth += (openMatches * 3);
+        depth -= (closeMatches * 3);
+
+        if (depth <= 0) {
+          let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+          if (contentToAdd.trim() || k !== i) {
+            contentLines.push(contentToAdd);
+          }
+          i = k + 1;
+          foundEnd = true;
+          break;
+        }
+        
+        contentLines.push(textToAnalyze);
+        k++;
+      }
+
+      if (foundEnd) {
+        renderedContent.push(
+          <div key={getKey("raw-block-main")} className="whitespace-pre-wrap">
+            {contentLines.join("\n")}
+          </div>
+        );
+        continue;
+      }
+    }
 
     if (line.startsWith("{{{#!wiki")) {
       // 1. 스타일 추출
