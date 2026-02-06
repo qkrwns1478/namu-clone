@@ -7,6 +7,11 @@ import { headers } from 'next/headers'
 import { writeFile, access } from 'fs/promises'
 import { join, parse } from 'path'
 import { constants } from 'fs'
+import bcrypt from 'bcryptjs'
+import { SignJWT, jwtVerify } from 'jose'
+import { cookies } from 'next/headers'
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 const prisma = new PrismaClient()
 
@@ -106,12 +111,14 @@ export async function saveWikiPage(formData: FormData) {
       }
 
       // 5. 리비전 저장 (기존 코드)
+      const session = await getSession()
       await tx.wikiRevision.create({
-          data: {
+        data: {
           content,
           comment: comment || '문서 수정',
-          ipAddress: ip,
+          ipAddress: session ? null : ip,
           pageId: page.id,
+          authorId: session?.userId,
         },
       })
     })
@@ -372,4 +379,69 @@ export async function searchTitles(query: string) {
     take: 10,
     select: { slug: true }
   })
+}
+
+// 세션 가져오기
+export async function getSession() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('session')?.value
+  if (!token) return null
+
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    return payload as { userId: number; username: string }
+  } catch (err) {
+    return null
+  }
+}
+
+// 회원가입
+export async function signUp(prevState: any, formData: FormData) {
+  const username = formData.get('username') as string
+  const password = formData.get('password') as string
+  
+  if (!username || !password) {
+    return { success: false, message: '아이디와 비밀번호를 모두 입력해주세요.' }
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10)
+    await prisma.user.create({
+      data: { username, password: hashedPassword }
+    })
+  } catch (error) {
+    console.error(error)
+    return { success: false, message: '이미 존재하는 아이디입니다.' }
+  }
+
+  redirect('/login')
+}
+
+// 로그인
+export async function login(prevState: any, formData: FormData) {
+  const username = formData.get('username') as string
+  const password = formData.get('password') as string
+
+  const user = await prisma.user.findUnique({ where: { username } })
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return { success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' }
+  }
+
+  // JWT 생성 및 쿠키 저장
+  const token = await new SignJWT({ userId: user.id, username: user.username })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime('24h')
+    .sign(JWT_SECRET)
+
+  const cookieStore = await cookies()
+  cookieStore.set('session', token, { httpOnly: true, secure: true })
+  
+  redirect('/')
+}
+
+// 로그아웃
+export async function logout() {
+  const cookieStore = await cookies()
+  cookieStore.delete('session')
+  redirect('/')
 }

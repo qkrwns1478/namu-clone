@@ -33,13 +33,25 @@ model CategoryOnPage {
   @@id([pageId, categoryId]) // 복합 키
 }
 
+model User {
+  id        Int            @id @default(autoincrement())
+  username  String         @unique
+  password  String
+  createdAt DateTime       @default(now())
+  revisions WikiRevision[] // 사용자가 작성한 리비전들
+}
+
 model WikiRevision {
-  id         Int      @id @default(autoincrement())
-  content    String   // 당시의 내용
-  comment    String?  // 수정 코멘트 (예: 오타 수정)
-  ipAddress  String?
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  content   String   
+  comment   String?
+  ipAddress String?  // 비로그인 시 IP 기록
+  createdAt DateTime @default(now())
   
-  page       WikiPage @relation(fields: [pageId], references: [id])
-  pageId     Int
+  page      WikiPage @relation(fields: [pageId], references: [id])
+  pageId    Int
+  
+  // 로그인한 사용자를 위한 관계 추가
+  author    User?    @relation(fields: [authorId], references: [id])
+  authorId  Int?
 }
