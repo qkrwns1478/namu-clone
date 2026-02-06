@@ -10,6 +10,16 @@ import { constants } from 'fs'
 
 const prisma = new PrismaClient()
 
+// Include 매크로용 문서 내용 조회
+export async function fetchWikiContent(slug: string) {
+  const decodedSlug = decodeURIComponent(slug)
+  const page = await prisma.wikiPage.findUnique({
+    where: { slug: decodedSlug },
+    select: { content: true }
+  })
+  return page?.content || null
+}
+
 // 문서 조회
 export async function getWikiPage(slug: string) {
   const decodedSlug = decodeURIComponent(slug)

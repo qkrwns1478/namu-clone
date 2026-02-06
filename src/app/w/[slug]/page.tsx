@@ -1,4 +1,4 @@
-import { getWikiPage, getCategoryDocs, getExistingSlugs } from "@/app/actions";
+import { getWikiPage, getCategoryDocs, getExistingSlugs, fetchWikiContent } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
@@ -193,7 +193,11 @@ export default async function WikiPage({ params }: Props) {
 
       {/* 본문 뷰어 */}
       <div className="min-h-[300px]">
-        <NamuViewer content={page.content} existingSlugs={existingSlugs} />
+        <NamuViewer 
+          content={page.content} 
+          existingSlugs={existingSlugs} 
+          fetchContent={fetchWikiContent} 
+        />
 
         {isCategoryPage && (
           <div className="mt-8">
