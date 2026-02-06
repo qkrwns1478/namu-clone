@@ -19,12 +19,14 @@ const IncludeRenderer = ({
   rawArgs,
   fetchContent,
   existingSlugs,
+  currentSlug,
   visitedSlugs = new Set<string>(),
   depth = 0,
 }: {
   rawArgs: string;
   fetchContent?: (slug: string) => Promise<string | null>;
   existingSlugs?: string[];
+  currentSlug?: string;
   visitedSlugs?: Set<string>;
   depth?: number;
 }) => {
@@ -80,6 +82,7 @@ const IncludeRenderer = ({
     <div>
       <NamuViewer
         content={content}
+        slug={currentSlug}
         existingSlugs={existingSlugs}
         fetchContent={fetchContent}
         visitedSlugs={new Set([...visitedSlugs, rawArgs.split(",")[0].trim()])}
@@ -202,12 +205,14 @@ type FootnoteData = {
 
 export default function NamuViewer({
   content,
+  slug,
   existingSlugs = [],
   fetchContent,
   visitedSlugs = new Set<string>(),
   includeDepth = 0,
 }: {
   content: string;
+  slug?: string;
   existingSlugs?: string[];
   fetchContent?: (slug: string) => Promise<string | null>;
   visitedSlugs?: Set<string>;
@@ -216,7 +221,13 @@ export default function NamuViewer({
   const [isTocExpanded, setIsTocExpanded] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  const existingSet = useMemo(() => new Set(existingSlugs), [existingSlugs]);
+  const existingSet = useMemo(() => {
+    const set = new Set(existingSlugs);
+    if (slug) {
+      set.add(slug);
+    } 
+    return set;
+  }, [existingSlugs, slug]);
 
   const toggleSection = (id: string) => {
     setCollapsedSections((prev) => {
@@ -636,6 +647,7 @@ export default function NamuViewer({
             rawArgs={rawArgs}
             fetchContent={fetchContent}
             existingSlugs={existingSlugs}
+            currentSlug={slug}
           />,
           ...parseInline(after),
         ];
@@ -866,10 +878,10 @@ export default function NamuViewer({
           ];
         } else {
           const hashIndex = target.indexOf("#");
-          let targetSlug = target;
+          let targetSlug = target.trim();
           let anchor = "";
           if (hashIndex !== -1) {
-            targetSlug = target.substring(0, hashIndex);
+            targetSlug = target.substring(0, hashIndex).trim();
             anchor = target.substring(hashIndex);
           }
           const isExist = existingSet.has(targetSlug);

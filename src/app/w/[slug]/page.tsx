@@ -190,6 +190,7 @@ export default async function WikiPage({ params }: Props) {
       <div className="min-h-[300px]">
         <NamuViewer 
           content={page.content} 
+          slug={decodedSlug}
           existingSlugs={existingSlugs} 
           fetchContent={fetchWikiContent} 
         />
