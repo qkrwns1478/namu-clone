@@ -445,3 +445,23 @@ export async function logout() {
   cookieStore.delete('session')
   redirect('/')
 }
+
+// 사용자 문서 기역 내역 보기
+export async function getUserContributions(username: string) {
+  return await prisma.wikiRevision.findMany({
+    where: {
+      author: {
+        username: username
+      }
+    },
+    include: {
+      page: {
+        select: { slug: true }
+      }
+    },
+    orderBy: {
+      createdAt: 'desc'
+    },
+    take: 50
+  })
+}

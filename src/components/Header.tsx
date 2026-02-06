@@ -185,8 +185,9 @@ export default function Header() {
               <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded shadow-xl py-2 z-[70] text-gray-800 text-sm">
                 {user ? (
                   <>
-                    <div className="px-4 py-2 border-b border-gray-100 font-bold text-[#00a69c]">
-                      {user.username}님
+                    <div className="px-4 py-2 border-b border-gray-100 flex flex-col gap-0.5">
+                      <span className="text-sm">사용자</span>
+                      <span className="text-lg">{user.username}</span>
                     </div>
                     <Link
                       href={`/contributions/${user.username}`}
