@@ -286,7 +286,7 @@ export default function NamuViewer({
               <a href={`#${item.id}`} className="mr-1 text-[#0275d8] hover:!underline block truncate">
                 <span>{item.numberStr}</span>
               </a>
-              <span className="text-[#373a3c]">{item.text}</span>
+              <span className="text-[#373a3c]">{parseInline(item.text)}</span>
             </div>
           ))}
         </div>
@@ -1341,7 +1341,7 @@ export default function NamuViewer({
               <span>{numberStr}</span>
             </a>
           )}
-          <span>{text}</span>
+          <span>{parseInline(text)}</span>
           <div className="ml-auto flex gap-2 select-none" onClick={(e) => e.stopPropagation()}>
             <span className="text-[#0275d8] text-xs cursor-pointer font-normal hover:!underline">
               [편집]
