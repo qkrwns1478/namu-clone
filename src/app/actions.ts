@@ -335,3 +335,16 @@ export async function getExistingSlugs(slugs: string[]) {
   
   return pages.map(p => p.slug)
 }
+
+// 자동완성용 제목 검색
+export async function searchTitles(query: string) {
+  if (!query.trim()) return []
+
+  return await prisma.wikiPage.findMany({
+    where: {
+      slug: { contains: query }
+    },
+    take: 10,
+    select: { slug: true }
+  })
+}
