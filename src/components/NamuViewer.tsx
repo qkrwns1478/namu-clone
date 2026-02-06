@@ -35,7 +35,7 @@ const IncludeRenderer = ({
   useEffect(() => {
     const args = rawArgs.split(",");
     const slug = args[0].trim();
-    
+
     if (!fetchContent || depth >= MAX_INCLUDE_DEPTH || visitedSlugs.has(slug)) {
       setLoading(false);
       if (visitedSlugs.has(slug)) {
@@ -78,9 +78,9 @@ const IncludeRenderer = ({
 
   return (
     <div>
-      <NamuViewer 
-        content={content} 
-        existingSlugs={existingSlugs} 
+      <NamuViewer
+        content={content}
+        existingSlugs={existingSlugs}
         fetchContent={fetchContent}
         visitedSlugs={new Set([...visitedSlugs, rawArgs.split(",")[0].trim()])}
         includeDepth={depth + 1}
@@ -111,7 +111,7 @@ const Folding = ({ title, children }: { title: string; children: React.ReactNode
 };
 
 // 각주 툴팁 컴포넌트
-const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) => {
+const FootnoteRef = ({ id, label, content }: { id: number; label: string; content: React.ReactNode }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLElement>(null);
@@ -145,7 +145,7 @@ const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) 
           href={`#fn${id}`}
           className="text-[#0275d8] hover:!underline font-bold mx-0.5 cursor-pointer text-xs"
         >
-          [{id}]
+          [{label}]
         </a>
       </sup>
 
@@ -163,7 +163,7 @@ const FootnoteRef = ({ id, content }: { id: number; content: React.ReactNode }) 
               pointerEvents: "none",
             }}
           >
-            <span className="text-[#0275d8]">[{id}]</span>
+            <span className="text-[#0275d8] mr-1">[{label}]</span>
             {content}
             <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-[6px] border-t-[#ccc]"></div>
           </div>,
@@ -183,7 +183,6 @@ const parseCssStyle = (styleString: string): React.CSSProperties => {
     if (parts.length < 2) return;
 
     const key = parts[0].trim().replace(/-(\w)/g, (_, c) => c.toUpperCase());
-
     const value = parts.slice(1).join(":").trim();
 
     if (key && value) {
@@ -192,6 +191,13 @@ const parseCssStyle = (styleString: string): React.CSSProperties => {
   });
 
   return style;
+};
+
+// 각주 데이터 타입 정의
+type FootnoteData = {
+  id: number;
+  label: string;
+  content: React.ReactNode;
 };
 
 export default function NamuViewer({
@@ -318,7 +324,7 @@ export default function NamuViewer({
   });
 
   // 3. [각주 저장소]
-  const footnotes: React.ReactNode[] = [];
+  const footnotes: FootnoteData[] = [];
   let keyCounter = 0;
   const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
 
@@ -440,10 +446,8 @@ export default function NamuViewer({
         }
       }
 
-      // raw 문법 처리
       if (l.startsWith("{{{#!raw")) {
         let currentLineContent = l.replace(/^\{\{\{#!raw\s*/, "");
-
         const contentLines: string[] = [];
         let depth = 3;
         let k = j;
@@ -452,27 +456,20 @@ export default function NamuViewer({
         while (k < subLines.length) {
           let textToAnalyze = subLines[k];
           if (k === j) textToAnalyze = currentLineContent;
-
           const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
           const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
-
           depth += openMatches * 3;
           depth -= closeMatches * 3;
-
           if (depth <= 0) {
             let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
-            if (contentToAdd.trim() || k !== j) {
-              contentLines.push(contentToAdd);
-            }
+            if (contentToAdd.trim() || k !== j) contentLines.push(contentToAdd);
             j = k + 1;
             foundEnd = true;
             break;
           }
-
           contentLines.push(textToAnalyze);
           k++;
         }
-
         if (foundEnd) {
           nodes.push(
             <div key={getKey("raw-block")} className="whitespace-pre-wrap">
@@ -487,25 +484,15 @@ export default function NamuViewer({
         const tLines = [];
         let m = j;
         let tableDepth = 0;
-
         while (m < subLines.length) {
           const line = subLines[m];
-
           const open = (line.match(/\{\{\{/g) || []).length;
           const close = (line.match(/\}\}\}/g) || []).length;
           tableDepth += open - close;
-
           tLines.push(line);
           m++;
-
-          if (tableDepth <= 0) {
-            // 깊이가 0인데 다음 줄이 ||로 시작 안 하면 테이블 종료
-            if (m < subLines.length && !subLines[m].trim().startsWith("||")) {
-              break;
-            }
-          }
+          if (tableDepth <= 0 && m < subLines.length && !subLines[m].trim().startsWith("||")) break;
         }
-
         nodes.push(parseTable(tLines));
         j = m;
       } else {
@@ -518,8 +505,9 @@ export default function NamuViewer({
 
   // [Inline Parser]
   function parseInline(text: string): React.ReactNode[] {
-    const noteRegex = /\[\*(.*?)\]/;
-    const noteMatch = noteRegex.exec(text);
+    // 1. Note 감지
+    const noteStartRegex = /\[\*/;
+    const noteStartMatch = noteStartRegex.exec(text);
 
     const includeRegex = /\[include\((.*?)\)\]/i;
     const includeMatch = includeRegex.exec(text);
@@ -557,7 +545,7 @@ export default function NamuViewer({
     const subMatch = subRegex.exec(text);
 
     const candidates = [
-      { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
+      { type: "note", idx: noteStartMatch ? noteStartMatch.index : Infinity, match: noteStartMatch },
       { type: "include", idx: includeMatch ? includeMatch.index : Infinity, match: includeMatch },
       { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
       { type: "youtube", idx: youtubeMatch ? youtubeMatch.index : Infinity, match: youtubeMatch },
@@ -576,30 +564,64 @@ export default function NamuViewer({
       if (candidate.idx === Infinity) break;
 
       if (candidate.type === "note" && candidate.match) {
-        const match = candidate.match;
-        const before = text.slice(0, match.index);
-        const noteContentRaw = match[1];
-        const after = text.slice(match.index + match[0].length);
-        const parsedNoteContent = parseInline(noteContentRaw);
+        const startIdx = candidate.idx;
+        let depth = 0;
+        let endIdx = -1;
 
-        footnotes.push(<span key={getKey("fn-content")}>{parsedNoteContent}</span>);
-        const noteId = footnotes.length;
+        // [* ... ] 중첩 대괄호 처리
+        for (let i = startIdx; i < text.length; i++) {
+          if (text[i] === "[") depth++;
+          else if (text[i] === "]") {
+            depth--;
+            if (depth === 0) {
+              endIdx = i;
+              break;
+            }
+          }
+        }
 
-        return [
-          ...parseInline(before),
-          <FootnoteRef key={getKey("fn-ref")} id={noteId} content={parsedNoteContent} />,
-          ...parseInline(after),
-        ];
-      }
+        if (endIdx !== -1) {
+          const before = text.slice(0, startIdx);
+          const rawContent = text.slice(startIdx + 2, endIdx); // [* 와 ] 제거
+          const after = text.slice(endIdx + 1);
 
-      if (candidate.type === "br" && candidate.match) {
-        const before = text.slice(0, candidate.idx);
-        const after = text.slice(candidate.idx + candidate.match[0].length);
-        return [
-          ...parseInline(before),
-          <br key={getKey("br-inline")} />,
-          ...parseInline(after),
-        ];
+          let label = "";
+          let contentText = rawContent;
+
+          // 공백으로 시작하면 일반 텍스트(자동 번호), 아니면 커스텀 라벨
+          if (!rawContent.startsWith(" ")) {
+            // 커스텀 라벨 파싱: 첫 공백 전까지가 라벨
+            const spaceIdx = rawContent.indexOf(" ");
+            if (spaceIdx !== -1) {
+              label = rawContent.slice(0, spaceIdx);
+              contentText = rawContent.slice(spaceIdx + 1);
+            } else {
+              // 공백이 없으면 전체가 라벨 (내용 없음)
+              label = rawContent;
+              contentText = "";
+            }
+          } else {
+            // 자동 번호 (맨 앞 공백 제거)
+            contentText = rawContent.slice(1);
+          }
+
+          const parsedContent = parseInline(contentText);
+          const noteId = footnotes.length + 1;
+          const displayLabel = label || `${noteId}`;
+
+          footnotes.push({
+            id: noteId,
+            label: displayLabel,
+            content: parsedContent,
+          });
+
+          return [
+            ...parseInline(before),
+            <FootnoteRef key={getKey("fn-ref")} id={noteId} label={displayLabel} content={parsedContent} />,
+            ...parseInline(after),
+          ];
+        }
+        continue;
       }
 
       if (candidate.type === "include" && candidate.match) {
@@ -607,7 +629,6 @@ export default function NamuViewer({
         const before = text.slice(0, match.index);
         const rawArgs = match[1];
         const after = text.slice(match.index + match[0].length);
-
         return [
           ...parseInline(before),
           <IncludeRenderer
@@ -636,13 +657,11 @@ export default function NamuViewer({
             i += 2;
           }
         }
-
         if (endIdx !== -1) {
           const before = text.slice(0, candidate.idx);
           const rawContent = text.slice(candidate.idx + 3, endIdx);
           const after = text.slice(endIdx + 3);
 
-          // 인라인 raw 문법 처리
           if (rawContent.startsWith("#!raw")) {
             const inner = rawContent.replace(/^#!raw\s?/, "");
             return [
@@ -653,20 +672,16 @@ export default function NamuViewer({
               ...parseInline(after),
             ];
           }
-
           if (rawContent.startsWith("#!folding")) {
             const parts = rawContent.replace("#!folding", "").trim();
             let title = "more";
             let foldingContent = parts;
-
             const titleMatch = parts.match(/^\[(.*?)\]/);
             if (titleMatch) {
               title = titleMatch[0];
               foldingContent = parts.substring(titleMatch[0].length).trim();
             }
-
             const contentLines = foldingContent.split("\n");
-
             return [
               ...parseInline(before),
               <Folding key={getKey("folding-inline")} title={title}>
@@ -675,15 +690,12 @@ export default function NamuViewer({
               ...parseInline(after),
             ];
           }
-
           if (rawContent.startsWith("#!wiki")) {
             const styleMatch = rawContent.match(/style="([^"]*)"/);
             const styleString = styleMatch ? styleMatch[1] : "";
             const customStyle = parseCssStyle(styleString);
             const innerContent = rawContent.replace(/^#!wiki(\s+style="[^"]*")?/, "").trim();
-
             const contentLines = innerContent.split("\n");
-
             return [
               ...parseInline(before),
               <div key={getKey("wiki-inline")} style={customStyle}>
@@ -693,7 +705,6 @@ export default function NamuViewer({
             ];
           }
 
-          // 1. 색상
           if (rawContent.trim().startsWith("#")) {
             const spaceIdx = rawContent.indexOf(" ");
             let colorDef = "";
@@ -709,7 +720,6 @@ export default function NamuViewer({
             else if (colorVal.startsWith("#") && !/^#[0-9A-Fa-f]{3,8}$/.test(colorVal)) {
               colorVal = colorVal.substring(1);
             }
-
             return [
               ...parseInline(before),
               <span key={getKey("color")} style={{ color: colorVal }}>
@@ -719,7 +729,6 @@ export default function NamuViewer({
             ];
           }
 
-          // 2. 텍스트 크기
           const sizeMatch = rawContent.match(/^\s*([+-])([1-5])\s+([\s\S]*)$/);
           if (sizeMatch) {
             const sign = sizeMatch[1];
@@ -751,6 +760,12 @@ export default function NamuViewer({
         }
       }
 
+      if (candidate.type === "br" && candidate.match) {
+        const before = text.slice(0, candidate.idx);
+        const after = text.slice(candidate.idx + candidate.match[0].length);
+        return [...parseInline(before), <br key={getKey("br-inline")} />, ...parseInline(after)];
+      }
+
       if (candidate.type === "youtube" && candidate.match) {
         const match = candidate.match;
         const before = text.slice(0, match.index);
@@ -765,7 +780,6 @@ export default function NamuViewer({
           if (arg.startsWith("width=")) width = arg.split("=")[1];
           if (arg.startsWith("height=")) height = arg.split("=")[1];
         }
-
         return [
           ...parseInline(before),
           <div key={getKey("youtube")} className="block max-w-full">
@@ -789,7 +803,6 @@ export default function NamuViewer({
         const before = text.slice(0, match.index);
         const rawContent = match[1];
         const after = text.slice(match.index + match[0].length);
-
         let splitIndex = -1;
         let depth = 0;
         for (let i = 0; i < rawContent.length; i++) {
@@ -800,10 +813,8 @@ export default function NamuViewer({
             break;
           }
         }
-
         const target = splitIndex !== -1 ? rawContent.slice(0, splitIndex) : rawContent;
         const optionsRaw = splitIndex !== -1 ? rawContent.slice(splitIndex + 1) : "";
-
         if (/^(파일|File|이미지):/i.test(target)) {
           const filename = target.split(":")[1];
           const options = optionsRaw.split("|");
@@ -817,7 +828,10 @@ export default function NamuViewer({
           });
           return [
             ...parseInline(before),
-            <span key={getKey("file")} className="flex justify-center items-center w-full align-middle">
+            <span
+              key={getKey("file")}
+              className="flex justify-center items-center w-full align-middle my-1"
+            >
               <img
                 src={`/uploads/${filename}`}
                 alt={filename}
@@ -828,10 +842,8 @@ export default function NamuViewer({
             ...parseInline(after),
           ];
         }
-
         const isExternal = /^https?:\/\//i.test(target);
         const labelNodes = optionsRaw ? parseInline(optionsRaw) : [target];
-
         if (isExternal) {
           const hasImageInLabel = /\[\[(?:파일|File|이미지):/i.test(optionsRaw);
           return [
@@ -860,10 +872,8 @@ export default function NamuViewer({
             targetSlug = target.substring(0, hashIndex);
             anchor = target.substring(hashIndex);
           }
-
           const isExist = existingSet.has(targetSlug);
           const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
-
           return [
             ...parseInline(before),
             <Link
@@ -895,7 +905,11 @@ export default function NamuViewer({
         const before = text.slice(0, match.index);
         const inner = match[1];
         const after = text.slice(match.index + match[0].length);
-        return [...parseInline(before), <i key={getKey("italic")}>{parseInline(inner)}</i>, ...parseInline(after)];
+        return [
+          ...parseInline(before),
+          <i key={getKey("italic")}>{parseInline(inner)}</i>,
+          ...parseInline(after),
+        ];
       }
 
       if (candidate.type === "underline" && candidate.match) {
@@ -968,15 +982,12 @@ export default function NamuViewer({
 
   function parseColorValue(val: string) {
     if (!val) return "";
-    if (val.includes(",")) {
-      return val.split(",")[0].trim();
-    }
+    if (val.includes(",")) return val.split(",")[0].trim();
     return val.trim();
   }
 
   function parseCellAttributes(rawContent: string) {
     let content = rawContent;
-
     let style: React.CSSProperties = {};
     let tableStyle: React.CSSProperties = {};
     let rowStyle: React.CSSProperties = {};
@@ -993,10 +1004,8 @@ export default function NamuViewer({
     while (true) {
       const trimmedCheck = content.trimStart();
       if (!trimmedCheck.startsWith("<")) break;
-
       const endIdx = trimmedCheck.indexOf(">");
       if (endIdx === -1) break;
-
       const tagContent = trimmedCheck.slice(1, endIdx);
       const lowerInner = tagContent.toLowerCase().trim();
       let handled = false;
@@ -1025,8 +1034,7 @@ export default function NamuViewer({
         }
         handled = true;
       } else if (lowerInner.startsWith("tablewidth=")) {
-        const v = tagContent.split("=")[1];
-        tableStyle.width = formatSize(v);
+        tableStyle.width = formatSize(tagContent.split("=")[1]);
         handled = true;
       } else if (lowerInner.startsWith("table")) {
         const optsStr = tagContent.substring(5).trim();
@@ -1036,15 +1044,12 @@ export default function NamuViewer({
           if (parts.length === 2) {
             const k = parts[0].toLowerCase();
             const v = parseColorValue(parts[1]);
-
-            if (k === "bordercolor") {
-              tableStyle.borderColor = v;
-            } else if (k === "bgcolor") {
+            if (k === "bordercolor") tableStyle.borderColor = v;
+            else if (k === "bgcolor") {
               tableStyle.backgroundColor = v;
               style.backgroundColor = v;
-            } else if (k === "width") {
-              tableStyle.width = formatSize(v);
-            } else if (k === "align") {
+            } else if (k === "width") tableStyle.width = formatSize(v);
+            else if (k === "align") {
               if (v === "right") {
                 tableStyle.float = "right";
                 tableStyle.marginLeft = "10px";
@@ -1126,29 +1131,17 @@ export default function NamuViewer({
       if (handled) {
         const tagString = "<" + tagContent + ">";
         const tagIndex = content.indexOf(tagString);
-
-        if (tagIndex !== -1) {
-          content = content.slice(tagIndex + tagString.length);
-        } else {
-          break;
-        }
-      } else {
-        break;
-      }
+        if (tagIndex !== -1) content = content.slice(tagIndex + tagString.length);
+        else break;
+      } else break;
     }
 
     if (!style.textAlign) {
-      if (content.startsWith(" ") && content.endsWith(" ")) {
-        style.textAlign = "center";
-      } else if (content.startsWith(" ") && !content.endsWith(" ")) {
-        style.textAlign = "right";
-      } else if (!content.startsWith(" ") && content.endsWith(" ")) {
-        style.textAlign = "left";
-      }
+      if (content.startsWith(" ") && content.endsWith(" ")) style.textAlign = "center";
+      else if (content.startsWith(" ") && !content.endsWith(" ")) style.textAlign = "right";
+      else if (!content.startsWith(" ") && content.endsWith(" ")) style.textAlign = "left";
     }
-
     content = content.trim();
-
     return { style, tableStyle, rowStyle, colStyle, colSpan, rowSpan, content };
   }
 
@@ -1202,8 +1195,9 @@ export default function NamuViewer({
     let maxCols = 0;
 
     if (rows.length > 0) {
-      // rows.forEach((r) => (maxCols = Math.max(maxCols, r.length)));
-      rows.forEach((r) => { maxCols = Math.max(maxCols, r.length); });
+      rows.forEach((r) => {
+        maxCols = Math.max(maxCols, r.length);
+      });
 
       rows.forEach((cells) => {
         cells.forEach((cell) => {
@@ -1306,7 +1300,6 @@ export default function NamuViewer({
         </div>
       );
     }
-
     if (line.toLowerCase() === "[clearfix]") {
       return <div key={getKey("clearfix")} className="clear-both" />;
     }
@@ -1408,47 +1401,36 @@ export default function NamuViewer({
 
   const renderedContent: React.ReactNode[] = [];
   let i = 0;
-
   while (i < lines.length) {
     if (!visibilityMap[i]) {
       i++;
       continue;
     }
-
     const line = lines[i].replace(/\r$/, "").trim();
 
     if (line.startsWith("{{{#!raw")) {
       let currentLineContent = line.replace(/^\{\{\{#!raw\s*/, "");
-
       const contentLines: string[] = [];
       let depth = 3;
       let k = i;
       let foundEnd = false;
-
       while (k < lines.length) {
         let textToAnalyze = lines[k];
         if (k === i) textToAnalyze = currentLineContent;
-
         const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
         const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
-
         depth += openMatches * 3;
         depth -= closeMatches * 3;
-
         if (depth <= 0) {
           let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
-          if (contentToAdd.trim() || k !== i) {
-            contentLines.push(contentToAdd);
-          }
+          if (contentToAdd.trim() || k !== i) contentLines.push(contentToAdd);
           i = k + 1;
           foundEnd = true;
           break;
         }
-
         contentLines.push(textToAnalyze);
         k++;
       }
-
       if (foundEnd) {
         renderedContent.push(
           <div key={getKey("raw-block-main")} className="whitespace-pre-wrap">
@@ -1460,51 +1442,33 @@ export default function NamuViewer({
     }
 
     if (line.startsWith("{{{#!wiki")) {
-      // 1. 스타일 추출
       const styleMatch = line.match(/style="([^"]*)"/);
       const styleString = styleMatch ? styleMatch[1] : "";
       const customStyle = parseCssStyle(styleString);
-
-      // 2. 시작 태그 제거 후 남은 텍스트 확인
       let currentLineContent = line.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
-
       const contentLines: string[] = [];
       let depth = 3;
       let k = i;
       let foundEnd = false;
-
       while (k < lines.length) {
         let textToAnalyze = lines[k];
-
-        if (k === i) {
-          textToAnalyze = currentLineContent;
-        }
-
+        if (k === i) textToAnalyze = currentLineContent;
         const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
         const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
-
         depth += openMatches * 3;
         depth -= closeMatches * 3;
-
         if (depth <= 0) {
           let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
-          if (contentToAdd.trim() || k !== i) {
-            if (contentToAdd.trim()) contentLines.push(contentToAdd);
-          }
+          if (contentToAdd.trim() || k !== i) if (contentToAdd.trim()) contentLines.push(contentToAdd);
           i = k + 1;
           foundEnd = true;
           break;
         }
-
         if (k === i) {
           if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
-        } else {
-          contentLines.push(textToAnalyze);
-        }
-
+        } else contentLines.push(textToAnalyze);
         k++;
       }
-
       if (foundEnd) {
         renderedContent.push(
           <div key={getKey("wiki-block")} style={customStyle} className="wiki-block">
@@ -1515,24 +1479,18 @@ export default function NamuViewer({
       }
     }
 
-    // [접기/펼치기 파서]
     if (line.startsWith("{{{#!folding")) {
       const title = line.replace("{{{#!folding", "").trim();
-
       const contentLines: string[] = [];
       let depth = 3;
       let k = i + 1;
       let foundEnd = false;
-
       while (k < lines.length) {
         const currentLine = lines[k];
-
         const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
         const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
-
         depth += openMatches * 3;
         depth -= closeMatches * 3;
-
         if (depth <= 0) {
           const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, "");
           if (cleanedLine.trim()) contentLines.push(cleanedLine);
@@ -1540,11 +1498,9 @@ export default function NamuViewer({
           foundEnd = true;
           break;
         }
-
         contentLines.push(currentLine);
         k++;
       }
-
       if (foundEnd) {
         renderedContent.push(
           <Folding key={getKey("folding")} title={title}>
@@ -1559,24 +1515,15 @@ export default function NamuViewer({
       const tableLines = [];
       let j = i;
       let tableDepth = 0;
-
       while (j < lines.length) {
         const curr = lines[j];
-
         const open = (curr.match(/\{\{\{/g) || []).length;
         const close = (curr.match(/\}\}\}/g) || []).length;
         tableDepth += open - close;
-
         tableLines.push(curr);
         j++;
-
-        if (tableDepth <= 0) {
-          if (j < lines.length && !lines[j].trim().startsWith("||")) {
-            break;
-          }
-        }
+        if (tableDepth <= 0 && j < lines.length && !lines[j].trim().startsWith("||")) break;
       }
-
       if (tableLines.length > 0) {
         renderedContent.push(parseTable(tableLines));
         i = j;
@@ -1595,17 +1542,16 @@ export default function NamuViewer({
       {footnotes.length > 0 && (
         <div className="border-t mt-5 mb-5 pt-4 border-[#777]">
           <ol className="list-none space-y-1 text-sm text-gray-600">
-            {footnotes.map((note, index) => {
-              const num = index + 1;
+            {footnotes.map((note) => {
               return (
-                <li key={`fn-item-${num}`} id={`fn${num}`} className="flex gap-2 items-start">
+                <li key={`fn-item-${note.id}`} id={`fn${note.id}`} className="flex gap-2 items-start">
                   <a
-                    href={`#r${num}`}
+                    href={`#r${note.id}`}
                     className="text-[#0275d8] shrink-0 hover:!underline min-w-[20px] text-right"
                   >
-                    [{num}]
+                    [{note.label}]
                   </a>
-                  <span>{note}</span>
+                  <span>{note.content}</span>
                 </li>
               );
             })}
