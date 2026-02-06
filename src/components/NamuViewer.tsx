@@ -65,7 +65,7 @@ const IncludeRenderer = ({
   }, [rawArgs, fetchContent]);
 
   if (loading) return <span className="text-gray-400 text-xs">[Loading...]</span>;
-  if (!content) return <span className="text-red-500 text-xs">[Include Error: {rawArgs.split(',')[0]}]</span>;
+  if (!content) return <span className="text-red-500 text-xs">[Include Error: {rawArgs.split(",")[0]}]</span>;
 
   return (
     <div>
@@ -80,10 +80,7 @@ const Folding = ({ title, children }: { title: string; children: React.ReactNode
 
   return (
     <div className="w-[calc(100%-4px)] mx-[2px]">
-      <div
-        className="cursor-pointer select-none"
-        onClick={() => setIsOpen(!isOpen)}
-      >
+      <div className="cursor-pointer select-none" onClick={() => setIsOpen(!isOpen)}>
         <span className="font-bold text-[15px] text-gray-800">{title}</span>
       </div>
 
@@ -92,9 +89,7 @@ const Folding = ({ title, children }: { title: string; children: React.ReactNode
           isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
       >
-        <div className="overflow-hidden">
-          {children}
-        </div>
+        <div className="overflow-hidden">{children}</div>
       </div>
     </div>
   );
@@ -172,10 +167,8 @@ const parseCssStyle = (styleString: string): React.CSSProperties => {
     const parts = rule.split(":");
     if (parts.length < 2) return;
 
-    const key = parts[0]
-      .trim()
-      .replace(/-(\w)/g, (_, c) => c.toUpperCase());
-    
+    const key = parts[0].trim().replace(/-(\w)/g, (_, c) => c.toUpperCase());
+
     const value = parts.slice(1).join(":").trim();
 
     if (key && value) {
@@ -315,25 +308,23 @@ export default function NamuViewer({
     const res: string[] = [];
     let buf = "";
     let depth = 0;
-    
+
     for (let i = 0; i < text.length; i++) {
-        // 중괄호 깊이 추적
-        if (text.startsWith("{{{", i)) {
-            depth++;
-            buf += "{{{";
-            i += 2;
-        } else if (text.startsWith("}}}", i)) {
-            depth--;
-            buf += "}}}";
-            i += 2;
-        } else if (depth === 0 && text.startsWith("||", i)) {
-            // 깊이가 0일 때만 구분자로 인식
-            res.push(buf);
-            buf = "";
-            i++; 
-        } else {
-            buf += text[i];
-        }
+      if (text.startsWith("{{{", i)) {
+        depth++;
+        buf += "{{{";
+        i += 2;
+      } else if (text.startsWith("}}}", i)) {
+        depth--;
+        buf += "}}}";
+        i += 2;
+      } else if (depth === 0 && text.startsWith("||", i)) {
+        res.push(buf);
+        buf = "";
+        i++;
+      } else {
+        buf += text[i];
+      }
     }
     res.push(buf);
     return res;
@@ -358,118 +349,118 @@ export default function NamuViewer({
         let foundEnd = false;
 
         while (k < subLines.length) {
-            let textToAnalyze = subLines[k];
-            if (k === j) textToAnalyze = currentLineContent;
+          let textToAnalyze = subLines[k];
+          if (k === j) textToAnalyze = currentLineContent;
 
-            const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
-            const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
+          const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
+          const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
 
-            depth += openMatches * 3;
-            depth -= closeMatches * 3;
+          depth += openMatches * 3;
+          depth -= closeMatches * 3;
 
-            if (depth <= 0) {
-                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
-                if (contentToAdd.trim() || k !== j) {
-                    if (contentToAdd.trim()) contentLines.push(contentToAdd);
-                }
-                j = k + 1;
-                foundEnd = true;
-                break;
+          if (depth <= 0) {
+            let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+            if (contentToAdd.trim() || k !== j) {
+              if (contentToAdd.trim()) contentLines.push(contentToAdd);
             }
+            j = k + 1;
+            foundEnd = true;
+            break;
+          }
 
-            if (k === j) {
-                if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
-            } else {
-                contentLines.push(textToAnalyze);
-            }
-            k++;
+          if (k === j) {
+            if (textToAnalyze.trim()) contentLines.push(textToAnalyze);
+          } else {
+            contentLines.push(textToAnalyze);
+          }
+          k++;
         }
 
         if (foundEnd) {
-            nodes.push(
-                <div key={getKey("wiki-block-sub")} style={customStyle} className="wiki-block">
-                    {renderSubBlock(contentLines)}
-                </div>
-            );
-            continue;
+          nodes.push(
+            <div key={getKey("wiki-block-sub")} style={customStyle} className="wiki-block">
+              {renderSubBlock(contentLines)}
+            </div>,
+          );
+          continue;
         }
       }
 
       if (l.startsWith("{{{#!folding")) {
         const title = l.replace("{{{#!folding", "").trim();
         const contentLines: string[] = [];
-        let depth = 3; 
+        let depth = 3;
         let k = j + 1;
         let foundEnd = false;
 
         while (k < subLines.length) {
-            const currentLine = subLines[k];
-            const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
-            const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
-            depth += (openMatches * 3);
-            depth -= (closeMatches * 3);
+          const currentLine = subLines[k];
+          const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
+          const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
+          depth += openMatches * 3;
+          depth -= closeMatches * 3;
 
-            if (depth <= 0) {
-                const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, ""); 
-                if (cleanedLine.trim()) contentLines.push(cleanedLine);
-                j = k + 1;
-                foundEnd = true;
-                break;
-            }
-            contentLines.push(currentLine);
-            k++;
+          if (depth <= 0) {
+            const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, "");
+            if (cleanedLine.trim()) contentLines.push(cleanedLine);
+            j = k + 1;
+            foundEnd = true;
+            break;
+          }
+          contentLines.push(currentLine);
+          k++;
         }
 
         if (foundEnd) {
-            nodes.push(
-                <Folding key={getKey("folding-sub")} title={title}>
-                    {renderSubBlock(contentLines)}
-                </Folding>
-            );
-            continue;
+          nodes.push(
+            <Folding key={getKey("folding-sub")} title={title}>
+              {renderSubBlock(contentLines)}
+            </Folding>,
+          );
+          continue;
         }
       }
 
       // raw 문법 처리
       if (l.startsWith("{{{#!raw")) {
         let currentLineContent = l.replace(/^\{\{\{#!raw\s*/, "");
-        
+
         const contentLines: string[] = [];
-        let depth = 3; 
+        let depth = 3;
         let k = j;
         let foundEnd = false;
 
         while (k < subLines.length) {
-            let textToAnalyze = subLines[k];
-            if (k === j) textToAnalyze = currentLineContent;
+          let textToAnalyze = subLines[k];
+          if (k === j) textToAnalyze = currentLineContent;
 
-            const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
-            const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
+          const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
+          const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
 
-            depth += (openMatches * 3);
-            depth -= (closeMatches * 3);
+          depth += openMatches * 3;
+          depth -= closeMatches * 3;
 
-            if (depth <= 0) {
-                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
-                if (contentToAdd.trim() || k !== j) {
-                  contentLines.push(contentToAdd);
-                }
-                j = k + 1;
-                foundEnd = true;
-                break;
+          if (depth <= 0) {
+            let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+            if (contentToAdd.trim() || k !== j) {
+              contentLines.push(contentToAdd);
             }
-            
-            contentLines.push(textToAnalyze);
-            k++;
+            j = k + 1;
+            foundEnd = true;
+            break;
+          }
+
+          contentLines.push(textToAnalyze);
+          k++;
         }
 
         if (foundEnd) {
-            nodes.push(
-                <div key={getKey("raw-block")} className="whitespace-pre-wrap">
-                    {contentLines.join("\n")}
-                </div>
-            );
-            continue;
+          nodes.push(
+            <div key={getKey("raw-block")} className="whitespace-pre-wrap">
+              {contentLines.join("\n")}
+            </div>,
+          );
+          continue;
         }
       }
 
@@ -479,25 +470,23 @@ export default function NamuViewer({
         let tableDepth = 0;
 
         while (m < subLines.length) {
-            const line = subLines[m];
-            
-            // [핵심] 테이블 내부의 {{{ ... }}} 깊이를 추적하여,
-            // ||로 시작하지 않더라도 테이블의 일부(멀티라인 셀)로 포함
-            const open = (line.match(/\{\{\{/g) || []).length;
-            const close = (line.match(/\}\}\}/g) || []).length;
-            tableDepth += (open - close);
+          const line = subLines[m];
 
-            tLines.push(line);
-            m++;
+          const open = (line.match(/\{\{\{/g) || []).length;
+          const close = (line.match(/\}\}\}/g) || []).length;
+          tableDepth += open - close;
 
-            if (tableDepth <= 0) {
-                // 깊이가 0인데 다음 줄이 ||로 시작 안 하면 테이블 종료
-                if (m < subLines.length && !subLines[m].trim().startsWith("||")) {
-                    break;
-                }
+          tLines.push(line);
+          m++;
+
+          if (tableDepth <= 0) {
+            // 깊이가 0인데 다음 줄이 ||로 시작 안 하면 테이블 종료
+            if (m < subLines.length && !subLines[m].trim().startsWith("||")) {
+              break;
             }
+          }
         }
-        
+
         nodes.push(parseTable(tLines));
         j = m;
       } else {
@@ -516,14 +505,14 @@ export default function NamuViewer({
     const includeRegex = /\[include\((.*?)\)\]/i;
     const includeMatch = includeRegex.exec(text);
 
-    const braceIdx = text.indexOf("{{{"); 
+    const braceIdx = text.indexOf("{{{");
 
     const youtubeRegex = /\[youtube\((.*?)\)\]/i;
     const youtubeMatch = youtubeRegex.exec(text);
 
     const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
     const wikiMatch = wikiRegex.exec(text);
-    
+
     const boldRegex = /'''(.*?)'''/;
     const boldMatch = boldRegex.exec(text);
 
@@ -580,7 +569,7 @@ export default function NamuViewer({
       if (candidate.type === "include" && candidate.match) {
         const match = candidate.match;
         const before = text.slice(0, match.index);
-        const rawArgs = match[1]; // "문서명, 변수1=값1, ..."
+        const rawArgs = match[1];
         const after = text.slice(match.index + match[0].length);
 
         return [
@@ -636,18 +625,18 @@ export default function NamuViewer({
 
             const titleMatch = parts.match(/^\[(.*?)\]/);
             if (titleMatch) {
-                title = titleMatch[0];
-                foldingContent = parts.substring(titleMatch[0].length).trim();
+              title = titleMatch[0];
+              foldingContent = parts.substring(titleMatch[0].length).trim();
             }
 
             const contentLines = foldingContent.split("\n");
 
             return [
-                ...parseInline(before),
-                <Folding key={getKey("folding-inline")} title={title}>
-                    {renderSubBlock(contentLines)}
-                </Folding>,
-                ...parseInline(after)
+              ...parseInline(before),
+              <Folding key={getKey("folding-inline")} title={title}>
+                {renderSubBlock(contentLines)}
+              </Folding>,
+              ...parseInline(after),
             ];
           }
 
@@ -660,11 +649,11 @@ export default function NamuViewer({
             const contentLines = innerContent.split("\n");
 
             return [
-                ...parseInline(before),
-                <div key={getKey("wiki-inline")} style={customStyle}>
-                    {renderSubBlock(contentLines)}
-                </div>,
-                ...parseInline(after)
+              ...parseInline(before),
+              <div key={getKey("wiki-inline")} style={customStyle}>
+                {renderSubBlock(contentLines)}
+              </div>,
+              ...parseInline(after),
             ];
           }
 
@@ -701,9 +690,16 @@ export default function NamuViewer({
             const level = sizeMatch[2];
             const innerContent = sizeMatch[3];
             const sizeMapping: { [key: string]: string } = {
-              "+1": "1.28889em", "+2": "1.38889em", "+3": "1.48144em",
-              "+4": "1.57400em", "+5": "1.66667em", "-1": "0.92589em",
-              "-2": "0.83333em", "-3": "0.74067em", "-4": "0.64811em", "-5": "0.62222em",
+              "+1": "1.28889em",
+              "+2": "1.38889em",
+              "+3": "1.48144em",
+              "+4": "1.57400em",
+              "+5": "1.66667em",
+              "-1": "0.92589em",
+              "-2": "0.83333em",
+              "-3": "0.74067em",
+              "-4": "0.64811em",
+              "-5": "0.62222em",
             };
             const targetSize = sizeMapping[`${sign}${level}`] || "1em";
             return [
@@ -715,11 +711,7 @@ export default function NamuViewer({
             ];
           }
 
-          return [
-            ...parseInline(before),
-            ...parseInline(rawContent),
-            ...parseInline(after),
-          ];
+          return [...parseInline(before), ...parseInline(rawContent), ...parseInline(after)];
         }
       }
 
@@ -733,9 +725,9 @@ export default function NamuViewer({
         let width = "640px";
         let height = "360px";
         for (let i = 1; i < args.length; i++) {
-            const arg = args[i].trim();
-            if (arg.startsWith("width=")) width = arg.split("=")[1];
-            if (arg.startsWith("height=")) height = arg.split("=")[1];
+          const arg = args[i].trim();
+          if (arg.startsWith("width=")) width = arg.split("=")[1];
+          if (arg.startsWith("height=")) height = arg.split("=")[1];
         }
 
         return [
@@ -790,7 +782,12 @@ export default function NamuViewer({
           return [
             ...parseInline(before),
             <span key={getKey("file")} className="inline-block align-middle">
-              <img src={`/uploads/${filename}`} alt={filename} style={{ width }} className="max-w-full h-auto" />
+              <img
+                src={`/uploads/${filename}`}
+                alt={filename}
+                style={{ width }}
+                className="max-w-full h-auto"
+              />
             </span>,
             ...parseInline(after),
           ];
@@ -850,7 +847,11 @@ export default function NamuViewer({
         const before = text.slice(0, match.index);
         const inner = match[1];
         const after = text.slice(match.index + match[0].length);
-        return [...parseInline(before), <b key={getKey("bold")}>{parseInline(inner)}</b>, ...parseInline(after)];
+        return [
+          ...parseInline(before),
+          <b key={getKey("bold")}>{parseInline(inner)}</b>,
+          ...parseInline(after),
+        ];
       }
 
       if (candidate.type === "underline" && candidate.match) {
@@ -858,7 +859,11 @@ export default function NamuViewer({
         const before = text.slice(0, match.index);
         const inner = match[1];
         const after = text.slice(match.index + match[0].length);
-        return [...parseInline(before), <u key={getKey("underline")}>{parseInline(inner)}</u>, ...parseInline(after)];
+        return [
+          ...parseInline(before),
+          <u key={getKey("underline")}>{parseInline(inner)}</u>,
+          ...parseInline(after),
+        ];
       }
 
       if (candidate.type === "del" && candidate.match) {
@@ -896,9 +901,7 @@ export default function NamuViewer({
         const after = text.slice(match.index + match[0].length);
         return [
           ...parseInline(before),
-          <sup key={getKey("sup")}>
-            {parseInline(inner)}
-          </sup>,
+          <sup key={getKey("sup")}>{parseInline(inner)}</sup>,
           ...parseInline(after),
         ];
       }
@@ -910,9 +913,7 @@ export default function NamuViewer({
         const after = text.slice(match.index + match[0].length);
         return [
           ...parseInline(before),
-          <sub key={getKey("sub")}>
-            {parseInline(inner)}
-          </sub>,
+          <sub key={getKey("sub")}>{parseInline(inner)}</sub>,
           ...parseInline(after),
         ];
       }
@@ -960,14 +961,12 @@ export default function NamuViewer({
         const v = parseColorValue(tagContent.split("=")[1]);
         tableStyle.border = `2px solid ${v}`;
         handled = true;
-      }
-      else if (lowerInner.startsWith("tablebgcolor=")) {
+      } else if (lowerInner.startsWith("tablebgcolor=")) {
         const v = parseColorValue(tagContent.split("=")[1]);
         tableStyle.backgroundColor = v;
-        style.backgroundColor = v; 
+        style.backgroundColor = v;
         handled = true;
-      }
-      else if (lowerInner.startsWith("tablealign=")) {
+      } else if (lowerInner.startsWith("tablealign=")) {
         const v = lowerInner.split("=")[1];
         if (v === "right") {
           tableStyle.float = "right";
@@ -981,13 +980,11 @@ export default function NamuViewer({
           tableStyle.float = "none";
         }
         handled = true;
-      }
-      else if (lowerInner.startsWith("tablewidth=")) {
+      } else if (lowerInner.startsWith("tablewidth=")) {
         const v = tagContent.split("=")[1];
-        tableStyle.width = formatSize(v); 
+        tableStyle.width = formatSize(v);
         handled = true;
-      }
-      else if (lowerInner.startsWith("table")) {
+      } else if (lowerInner.startsWith("table")) {
         const optsStr = tagContent.substring(5).trim();
         const opts = optsStr.split(/\s+/);
         opts.forEach((opt) => {
@@ -1001,11 +998,9 @@ export default function NamuViewer({
             } else if (k === "bgcolor") {
               tableStyle.backgroundColor = v;
               style.backgroundColor = v;
-            } 
-            else if (k === "width") {
+            } else if (k === "width") {
               tableStyle.width = formatSize(v);
-            }
-            else if (k === "align") {
+            } else if (k === "align") {
               if (v === "right") {
                 tableStyle.float = "right";
                 tableStyle.marginLeft = "10px";
@@ -1020,57 +1015,48 @@ export default function NamuViewer({
           }
         });
         handled = true;
-      }
-      else if (lowerInner.startsWith("rowbgcolor=")) {
+      } else if (lowerInner.startsWith("rowbgcolor=")) {
         rowStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       } else if (lowerInner.startsWith("rowcolor=")) {
         rowStyle.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
-      }
-      else if (lowerInner.startsWith("colbgcolor=")) {
+      } else if (lowerInner.startsWith("colbgcolor=")) {
         colStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       } else if (lowerInner.startsWith("colcolor=")) {
         colStyle.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
-      }
-      else if (lowerInner === "nopad") {
+      } else if (lowerInner === "nopad") {
         style.padding = "0px";
         handled = true;
-      }
-      else if (lowerInner.startsWith("bgcolor=")) {
+      } else if (lowerInner.startsWith("bgcolor=")) {
         style.backgroundColor = parseColorValue(tagContent.split("=")[1]);
         handled = true;
       } else if (tagContent.startsWith("#")) {
         style.backgroundColor = parseColorValue(tagContent);
         handled = true;
-      }
-      else if (lowerInner.startsWith("color=")) {
+      } else if (lowerInner.startsWith("color=")) {
         style.color = parseColorValue(tagContent.split("=")[1]);
         handled = true;
-      }
-      else if (tagContent.startsWith("^|")) {
+      } else if (tagContent.startsWith("^|")) {
         style.verticalAlign = "top";
         const val = parseInt(tagContent.slice(2));
         if (!isNaN(val)) rowSpan = val;
         handled = true;
-      }
-      else if (tagContent.startsWith("v|")) {
+      } else if (tagContent.startsWith("v|")) {
         style.verticalAlign = "bottom";
         const val = parseInt(tagContent.slice(2));
         if (!isNaN(val)) rowSpan = val;
         handled = true;
-      }
-      else if (tagContent.startsWith("|")) {
+      } else if (tagContent.startsWith("|")) {
         style.verticalAlign = "middle";
         const val = parseInt(tagContent.slice(1));
         if (!isNaN(val)) {
           rowSpan = val;
           handled = true;
         }
-      }
-      else if (tagContent === "(") {
+      } else if (tagContent === "(") {
         style.textAlign = "left";
         handled = true;
       } else if (tagContent === ":") {
@@ -1079,15 +1065,13 @@ export default function NamuViewer({
       } else if (tagContent === ")") {
         style.textAlign = "right";
         handled = true;
-      }
-      else if (tagContent.startsWith("-")) {
+      } else if (tagContent.startsWith("-")) {
         const val = parseInt(tagContent.slice(1));
         if (!isNaN(val)) {
           colSpan = val;
           handled = true;
         }
-      }
-      else if (lowerInner.startsWith("width=")) {
+      } else if (lowerInner.startsWith("width=")) {
         style.width = formatSize(tagContent.split("=")[1]);
         handled = true;
       } else if (lowerInner.startsWith("height=")) {
@@ -1098,11 +1082,11 @@ export default function NamuViewer({
       if (handled) {
         const tagString = "<" + tagContent + ">";
         const tagIndex = content.indexOf(tagString);
-        
+
         if (tagIndex !== -1) {
-            content = content.slice(tagIndex + tagString.length);
+          content = content.slice(tagIndex + tagString.length);
         } else {
-            break;
+          break;
         }
       } else {
         break;
@@ -1130,22 +1114,22 @@ export default function NamuViewer({
     let braceDepth = 0;
 
     for (const line of lines) {
-        const open = (line.match(/\{\{\{/g) || []).length;
-        const close = (line.match(/\}\}\}/g) || []).length;
-        
-        if (braceDepth === 0 && currentBuffer === "") {
-            currentBuffer = line;
-            braceDepth += (open - close);
-        } else {
-            currentBuffer += "\n" + line;
-            braceDepth += (open - close);
-        }
+      const open = (line.match(/\{\{\{/g) || []).length;
+      const close = (line.match(/\}\}\}/g) || []).length;
 
-        if (braceDepth <= 0) {
-            mergedRows.push(currentBuffer);
-            currentBuffer = "";
-            braceDepth = 0;
-        }
+      if (braceDepth === 0 && currentBuffer === "") {
+        currentBuffer = line;
+        braceDepth += open - close;
+      } else {
+        currentBuffer += "\n" + line;
+        braceDepth += open - close;
+      }
+
+      if (braceDepth <= 0) {
+        mergedRows.push(currentBuffer);
+        currentBuffer = "";
+        braceDepth = 0;
+      }
     }
     if (currentBuffer) mergedRows.push(currentBuffer);
 
@@ -1168,14 +1152,13 @@ export default function NamuViewer({
       width: "auto",
       maxWidth: "100%",
       display: "table",
-      // marginBottom: "10px",
     };
 
     const colStyles: React.CSSProperties[] = [];
     let maxCols = 0;
 
     if (rows.length > 0) {
-      rows.forEach((r) => maxCols = Math.max(maxCols, r.length));
+      rows.forEach((r) => (maxCols = Math.max(maxCols, r.length)));
 
       rows.forEach((cells) => {
         cells.forEach((cell) => {
@@ -1206,8 +1189,8 @@ export default function NamuViewer({
       : { marginBottom: "10px" };
 
     if (containerStyle.width === "100%" && !isFloat) {
-        wrapperStyle.width = "100%";
-        wrapperStyle.display = "block"; 
+      wrapperStyle.width = "100%";
+      wrapperStyle.display = "block";
     }
 
     const tableStyleCleaned = { ...containerStyle };
@@ -1391,9 +1374,9 @@ export default function NamuViewer({
 
     if (line.startsWith("{{{#!raw")) {
       let currentLineContent = line.replace(/^\{\{\{#!raw\s*/, "");
-      
+
       const contentLines: string[] = [];
-      let depth = 3; 
+      let depth = 3;
       let k = i;
       let foundEnd = false;
 
@@ -1404,8 +1387,8 @@ export default function NamuViewer({
         const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
         const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
 
-        depth += (openMatches * 3);
-        depth -= (closeMatches * 3);
+        depth += openMatches * 3;
+        depth -= closeMatches * 3;
 
         if (depth <= 0) {
           let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
@@ -1416,7 +1399,7 @@ export default function NamuViewer({
           foundEnd = true;
           break;
         }
-        
+
         contentLines.push(textToAnalyze);
         k++;
       }
@@ -1425,7 +1408,7 @@ export default function NamuViewer({
         renderedContent.push(
           <div key={getKey("raw-block-main")} className="whitespace-pre-wrap">
             {contentLines.join("\n")}
-          </div>
+          </div>,
         );
         continue;
       }
@@ -1441,7 +1424,7 @@ export default function NamuViewer({
       let currentLineContent = line.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
 
       const contentLines: string[] = [];
-      let depth = 3; 
+      let depth = 3;
       let k = i;
       let foundEnd = false;
 
@@ -1473,7 +1456,7 @@ export default function NamuViewer({
         } else {
           contentLines.push(textToAnalyze);
         }
-        
+
         k++;
       }
 
@@ -1481,7 +1464,7 @@ export default function NamuViewer({
         renderedContent.push(
           <div key={getKey("wiki-block")} style={customStyle} className="wiki-block">
             {renderSubBlock(contentLines)}
-          </div>
+          </div>,
         );
         continue;
       }
@@ -1490,29 +1473,29 @@ export default function NamuViewer({
     // [접기/펼치기 파서]
     if (line.startsWith("{{{#!folding")) {
       const title = line.replace("{{{#!folding", "").trim();
-      
+
       const contentLines: string[] = [];
-      let depth = 3; 
+      let depth = 3;
       let k = i + 1;
       let foundEnd = false;
 
       while (k < lines.length) {
         const currentLine = lines[k];
-        
+
         const openMatches = (currentLine.match(/\{\{\{/g) || []).length;
         const closeMatches = (currentLine.match(/\}\}\}/g) || []).length;
-        
-        depth += (openMatches * 3);
-        depth -= (closeMatches * 3);
+
+        depth += openMatches * 3;
+        depth -= closeMatches * 3;
 
         if (depth <= 0) {
-          const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, ""); 
+          const cleanedLine = currentLine.replace(/\}\}\}(?!.*\}\}\})/, "");
           if (cleanedLine.trim()) contentLines.push(cleanedLine);
           i = k + 1;
           foundEnd = true;
           break;
         }
-        
+
         contentLines.push(currentLine);
         k++;
       }
@@ -1521,7 +1504,7 @@ export default function NamuViewer({
         renderedContent.push(
           <Folding key={getKey("folding")} title={title}>
             {renderSubBlock(contentLines)}
-          </Folding>
+          </Folding>,
         );
         continue;
       }
@@ -1535,19 +1518,17 @@ export default function NamuViewer({
       while (j < lines.length) {
         const curr = lines[j];
 
-        // 테이블 내부 셀에 {{{ ... }}} 가 열려있으면 줄이 ||로 시작 안 해도 테이블의 일부로 간주
         const open = (curr.match(/\{\{\{/g) || []).length;
         const close = (curr.match(/\}\}\}/g) || []).length;
-        tableDepth += (open - close);
+        tableDepth += open - close;
 
         tableLines.push(curr);
         j++;
 
-        // Depth가 0 이하로 떨어졌을 때만 '다음 줄이 테이블이 아니면 종료' 판단
         if (tableDepth <= 0) {
-            if (j < lines.length && !lines[j].trim().startsWith("||")) {
-                break;
-            }
+          if (j < lines.length && !lines[j].trim().startsWith("||")) {
+            break;
+          }
         }
       }
 
