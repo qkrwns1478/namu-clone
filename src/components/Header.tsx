@@ -79,6 +79,12 @@ export default function Header() {
     router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
+  const gotoPage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    router.push(`/w/${encodeURIComponent(query)}`);
+  };
+
   return (
     <nav
       className="h-[56px] flex items-center justify-center w-full z-50"
@@ -122,7 +128,7 @@ export default function Header() {
         <div className="flex items-center gap-2">
           {/* 검색창 영역 */}
           <div ref={wrapperRef} className="relative hidden sm:block w-[270px]">
-            <form onSubmit={handleSearch}>
+            <form onSubmit={gotoPage}>
               <div className="flex items-center bg-white w-full h-[36px] px-3 rounded-[4px] hover:shadow-[0_0_0_.25rem_hsla(0,0%,100%,0.4)] transition duration-150 ease-in-out relative">
                 <input
                   type="text"
