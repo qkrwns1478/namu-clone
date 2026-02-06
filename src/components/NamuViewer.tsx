@@ -14,6 +14,66 @@ type TocItem = {
   numberStr: string;
 };
 
+// Include 매크로 처리를 위한 내부 컴포넌트
+const IncludeRenderer = ({
+  rawArgs,
+  fetchContent,
+  existingSlugs,
+}: {
+  rawArgs: string;
+  fetchContent?: (slug: string) => Promise<string | null>;
+  existingSlugs?: string[];
+}) => {
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!fetchContent) {
+      setLoading(false);
+      return;
+    }
+
+    const args = rawArgs.split(",");
+    const slug = args[0].trim();
+    const params: { [key: string]: string } = {};
+
+    for (let i = 1; i < args.length; i++) {
+      const parts = args[i].split("=");
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join("=").trim();
+        params[key] = val;
+      }
+    }
+
+    fetchContent(slug)
+      .then((raw) => {
+        if (raw) {
+          let processed = raw;
+          Object.keys(params).forEach((key) => {
+            const val = params[key];
+            const regex = new RegExp(`@${key}@`, "g");
+            processed = processed.replace(regex, val);
+          });
+          setContent(processed);
+        }
+      })
+      .catch((err) => {
+        console.error("Include fetch error:", err);
+      })
+      .finally(() => setLoading(false));
+  }, [rawArgs, fetchContent]);
+
+  if (loading) return <span className="text-gray-400 text-xs">[Loading...]</span>;
+  if (!content) return <span className="text-red-500 text-xs">[Include Error: {rawArgs.split(',')[0]}]</span>;
+
+  return (
+    <div>
+      <NamuViewer content={content} existingSlugs={existingSlugs} fetchContent={fetchContent} />
+    </div>
+  );
+};
+
 // Folding 컴포넌트
 const Folding = ({ title, children }: { title: string; children: React.ReactNode }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -126,7 +186,15 @@ const parseCssStyle = (styleString: string): React.CSSProperties => {
   return style;
 };
 
-export default function NamuViewer({ content, existingSlugs = [] }: { content: string; existingSlugs?: string[] }) {
+export default function NamuViewer({
+  content,
+  existingSlugs = [],
+  fetchContent,
+}: {
+  content: string;
+  existingSlugs?: string[];
+  fetchContent?: (slug: string) => Promise<string | null>;
+}) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
@@ -402,6 +470,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     const noteRegex = /\[\*(.*?)\]/;
     const noteMatch = noteRegex.exec(text);
 
+    const includeRegex = /\[include\((.*?)\)\]/i;
+    const includeMatch = includeRegex.exec(text);
+
     const braceIdx = text.indexOf("{{{"); 
 
     const youtubeRegex = /\[youtube\((.*?)\)\]/i;
@@ -430,6 +501,8 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
     const candidates = [
       { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
+      { type: "include", idx: includeMatch ? includeMatch.index : Infinity, match: includeMatch },
+      { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
       { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
       { type: "youtube", idx: youtubeMatch ? youtubeMatch.index : Infinity, match: youtubeMatch },
       { type: "wiki", idx: wikiMatch ? wikiMatch.index : Infinity, match: wikiMatch },
@@ -457,6 +530,24 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         return [
           ...parseInline(before),
           <FootnoteRef key={getKey("fn-ref")} id={noteId} content={parsedNoteContent} />,
+          ...parseInline(after),
+        ];
+      }
+
+      if (candidate.type === "include" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const rawArgs = match[1]; // "문서명, 변수1=값1, ..."
+        const after = text.slice(match.index + match[0].length);
+
+        return [
+          ...parseInline(before),
+          <IncludeRenderer
+            key={getKey("include")}
+            rawArgs={rawArgs}
+            fetchContent={fetchContent}
+            existingSlugs={existingSlugs}
+          />,
           ...parseInline(after),
         ];
       }

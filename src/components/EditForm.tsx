@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { saveWikiPage, getExistingSlugs } from '@/app/actions'
+import { saveWikiPage, getExistingSlugs, fetchWikiContent } from '@/app/actions'
 import NamuViewer from '@/components/NamuViewer'
 
 export default function EditForm({ 
@@ -84,7 +84,11 @@ export default function EditForm({
       {/* 미리보기 영역 */}
       {activeTab === 'preview' && (
         <div className="w-full h-[60vh] p-4 border border-[#ccc] rounded-b-sm bg-white overflow-y-auto">
-          <NamuViewer content={content} existingSlugs={previewLinks} /> 
+          <NamuViewer 
+            content={content} 
+            existingSlugs={previewLinks} 
+            fetchContent={fetchWikiContent}
+          />
         </div>
       )}
 
