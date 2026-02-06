@@ -19,22 +19,31 @@ const IncludeRenderer = ({
   rawArgs,
   fetchContent,
   existingSlugs,
+  visitedSlugs = new Set<string>(),
+  depth = 0,
 }: {
   rawArgs: string;
   fetchContent?: (slug: string) => Promise<string | null>;
   existingSlugs?: string[];
+  visitedSlugs?: Set<string>;
+  depth?: number;
 }) => {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const MAX_INCLUDE_DEPTH = 5;
 
   useEffect(() => {
-    if (!fetchContent) {
+    const args = rawArgs.split(",");
+    const slug = args[0].trim();
+    
+    if (!fetchContent || depth >= MAX_INCLUDE_DEPTH || visitedSlugs.has(slug)) {
       setLoading(false);
+      if (visitedSlugs.has(slug)) {
+        console.warn("Circular include detected:", slug);
+      }
       return;
     }
 
-    const args = rawArgs.split(",");
-    const slug = args[0].trim();
     const params: { [key: string]: string } = {};
 
     for (let i = 1; i < args.length; i++) {
@@ -69,7 +78,13 @@ const IncludeRenderer = ({
 
   return (
     <div>
-      <NamuViewer content={content} existingSlugs={existingSlugs} fetchContent={fetchContent} />
+      <NamuViewer 
+        content={content} 
+        existingSlugs={existingSlugs} 
+        fetchContent={fetchContent}
+        visitedSlugs={new Set([...visitedSlugs, rawArgs.split(",")[0].trim()])}
+        includeDepth={depth + 1}
+      />
     </div>
   );
 };
@@ -183,10 +198,14 @@ export default function NamuViewer({
   content,
   existingSlugs = [],
   fetchContent,
+  visitedSlugs = new Set<string>(),
+  includeDepth = 0,
 }: {
   content: string;
   existingSlugs?: string[];
   fetchContent?: (slug: string) => Promise<string | null>;
+  visitedSlugs?: Set<string>;
+  includeDepth?: number;
 }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -534,7 +553,6 @@ export default function NamuViewer({
     const candidates = [
       { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
       { type: "include", idx: includeMatch ? includeMatch.index : Infinity, match: includeMatch },
-      { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
       { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
       { type: "youtube", idx: youtubeMatch ? youtubeMatch.index : Infinity, match: youtubeMatch },
       { type: "wiki", idx: wikiMatch ? wikiMatch.index : Infinity, match: wikiMatch },
@@ -1158,7 +1176,8 @@ export default function NamuViewer({
     let maxCols = 0;
 
     if (rows.length > 0) {
-      rows.forEach((r) => (maxCols = Math.max(maxCols, r.length)));
+      // rows.forEach((r) => (maxCols = Math.max(maxCols, r.length)));
+      rows.forEach((r) => { maxCols = Math.max(maxCols, r.length); });
 
       rows.forEach((cells) => {
         cells.forEach((cell) => {
