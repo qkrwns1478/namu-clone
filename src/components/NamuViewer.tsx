@@ -19,12 +19,12 @@ const Folding = ({ title, children }: { title: string; children: React.ReactNode
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="my-2">
+    <div className="w-[calc(100%-4px)] mx-[2px]">
       <div
-        className="cursor-pointer select-none inline-block"
+        className="cursor-pointer select-none"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="font-bold text-gray-800">{title}</span>
+        <span className="font-bold text-[15px] text-gray-800">{title}</span>
       </div>
 
       <div
@@ -33,9 +33,7 @@ const Folding = ({ title, children }: { title: string; children: React.ReactNode
         }`}
       >
         <div className="overflow-hidden">
-          <div className="mt-2">
-            {children}
-          </div>
+          {children}
         </div>
       </div>
     </div>
@@ -244,10 +242,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
   let keyCounter = 0;
   const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
 
-  // =================================================================================
-  // [CORE PARSERS]
-  // =================================================================================
-
   // [Helper] Brace Depth를 고려하여 "||" 로 셀을 분리하는 함수
   function splitCells(text: string): string[] {
     const res: string[] = [];
@@ -255,6 +249,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     let depth = 0;
     
     for (let i = 0; i < text.length; i++) {
+        // 중괄호 깊이 추적
         if (text.startsWith("{{{", i)) {
             depth++;
             buf += "{{{";
@@ -265,11 +260,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             i += 2;
         } else if (depth === 0 && text.startsWith("||", i)) {
             // 깊이가 0일 때만 구분자로 인식
-            // 맨 앞의 ||, 맨 뒤의 ||도 이 로직을 타서 빈 문자열로 들어갈 수 있으므로
-            // parseTable에서 빈 셀 처리를 함.
             res.push(buf);
             buf = "";
-            i++; // ||는 2글자이므로 i를 하나 더 증가 (루프에서 i++ 되므로 총 +2)
+            i++; 
         } else {
             buf += text[i];
         }
@@ -285,7 +278,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     while (j < subLines.length) {
       const l = subLines[j].replace(/\r$/, "").trim();
 
-      // --- [Wiki 블록 재귀 처리] ---
       if (l.startsWith("{{{#!wiki")) {
         const styleMatch = l.match(/style="([^"]*)"/);
         const styleString = styleMatch ? styleMatch[1] : "";
@@ -335,7 +327,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
       }
 
-      // --- [Folding 블록 재귀 처리] ---
       if (l.startsWith("{{{#!folding")) {
         const title = l.replace("{{{#!folding", "").trim();
         const contentLines: string[] = [];
@@ -371,39 +362,33 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
       }
 
-      // --- [Table 블록 처리] ---
-      // renderSubBlock 내에서도 멀티라인 테이블 인식을 위해 로직 보강
       if (l.startsWith("||")) {
-         // 여기서 다시 parseTable을 호출하지만,
-         // parseTable은 lines 배열을 받으므로, 여기서 테이블에 해당하는 줄들을 모아줘야 함.
-         const tLines = [];
-         let m = j;
-         let tableDepth = 0;
+        const tLines = [];
+        let m = j;
+        let tableDepth = 0;
 
-         while (m < subLines.length) {
-             const line = subLines[m];
-             // 테이블 시작 혹은 진행 중
-             // 간단하게는 ||로 시작하면 테이블이지만, 
-             // 멀티라인 셀이 있으면 ||로 시작 안 할 수도 있음.
-             // 따라서 Main Loop와 동일한 수집 로직이 필요함.
-             
-             const open = (line.match(/\{\{\{/g) || []).length;
-             const close = (line.match(/\}\}\}/g) || []).length;
-             tableDepth += (open - close);
+        while (m < subLines.length) {
+            const line = subLines[m];
+            
+            // [핵심] 테이블 내부의 {{{ ... }}} 깊이를 추적하여,
+            // ||로 시작하지 않더라도 테이블의 일부(멀티라인 셀)로 포함
+            const open = (line.match(/\{\{\{/g) || []).length;
+            const close = (line.match(/\}\}\}/g) || []).length;
+            tableDepth += (open - close);
 
-             tLines.push(line);
-             m++;
+            tLines.push(line);
+            m++;
 
-             if (tableDepth <= 0) {
-                 // 깊이가 0인데 다음 줄이 ||로 시작 안 하면 테이블 종료
-                 if (m < subLines.length && !subLines[m].trim().startsWith("||")) {
-                     break;
-                 }
-             }
-         }
-         
-         nodes.push(parseTable(tLines));
-         j = m;
+            if (tableDepth <= 0) {
+                // 깊이가 0인데 다음 줄이 ||로 시작 안 하면 테이블 종료
+                if (m < subLines.length && !subLines[m].trim().startsWith("||")) {
+                    break;
+                }
+            }
+        }
+        
+        nodes.push(parseTable(tLines));
+        j = m;
       } else {
         nodes.push(parseLine(subLines[j], -1));
         j++;
@@ -508,7 +493,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             ];
           }
 
-           if (rawContent.startsWith("#!wiki")) {
+          if (rawContent.startsWith("#!wiki")) {
             const styleMatch = rawContent.match(/style="([^"]*)"/);
             const styleString = styleMatch ? styleMatch[1] : "";
             const customStyle = parseCssStyle(styleString);
@@ -518,7 +503,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
             return [
                 ...parseInline(before),
-                <div key={getKey("wiki-inline")} style={customStyle} className="inline-block">
+                <div key={getKey("wiki-inline")} style={customStyle}>
                     {renderSubBlock(contentLines)}
                 </div>,
                 ...parseInline(after)
@@ -761,7 +746,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       return /^\d+$/.test(trimVal) ? `${trimVal}px` : trimVal;
     };
 
+    // 태그 파싱 루프
     while (true) {
+      // 앞쪽 공백 제거 후 태그 확인
       const trimmedCheck = content.trimStart();
       if (!trimmedCheck.startsWith("<")) break;
 
@@ -772,6 +759,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const lowerInner = tagContent.toLowerCase().trim();
       let handled = false;
 
+      // --- 속성 처리 로직 ---
       if (lowerInner.startsWith("tablebordercolor=")) {
         const v = parseColorValue(tagContent.split("=")[1]);
         tableStyle.border = `2px solid ${v}`;
@@ -905,11 +893,16 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       }
 
       if (handled) {
-        const realTagIndex = content.indexOf("<" + tagContent + ">");
-        if (realTagIndex !== -1) {
-          content = content.slice(realTagIndex + tagContent.length + 2);
+        // 태그가 처리되었다면 원본 content에서 해당 태그 제거 (공백 포함 위치 찾기)
+        // trimStart() 하기 전의 원본 content에서 태그 위치를 찾아야 함
+        const tagString = "<" + tagContent + ">";
+        const tagIndex = content.indexOf(tagString);
+        
+        if (tagIndex !== -1) {
+            content = content.slice(tagIndex + tagString.length);
         } else {
-          break;
+            // 혹시라도 indexOf 실패 시 (trim 등의 이유로), 루프 탈출
+            break;
         }
       } else {
         break;
@@ -932,45 +925,38 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
   }
 
   function parseTable(lines: string[]) {
-    // [FIX] 줄 병합 로직 (Multi-line Cell 지원)
-    // 괄호가 열려있다면 다음 줄도 같은 행으로 취급하여 병합
     const mergedRows: string[] = [];
     let currentBuffer = "";
     let braceDepth = 0;
 
+    // 1. 줄 병합 (멀티라인 셀 지원)
     for (const line of lines) {
         const open = (line.match(/\{\{\{/g) || []).length;
         const close = (line.match(/\}\}\}/g) || []).length;
         
         if (braceDepth === 0 && currentBuffer === "") {
-             currentBuffer = line;
-             braceDepth += (open - close);
+            currentBuffer = line;
+            braceDepth += (open - close);
         } else {
-             // 줄바꿈을 유지하며 병합
-             currentBuffer += "\n" + line;
-             braceDepth += (open - close);
+            currentBuffer += "\n" + line;
+            braceDepth += (open - close);
         }
 
         if (braceDepth <= 0) {
-             mergedRows.push(currentBuffer);
-             currentBuffer = "";
-             braceDepth = 0;
+            mergedRows.push(currentBuffer);
+            currentBuffer = "";
+            braceDepth = 0;
         }
     }
     if (currentBuffer) mergedRows.push(currentBuffer);
 
+    // 2. 행 및 셀 파싱
     const rows = mergedRows.map((line) => {
       const trimmed = line.trim();
-      
-      // [FIX] splitCells 함수 사용: 괄호 깊이를 고려하여 || 분리
-      // 기존: const rawCells = trimmed.split("||"); -> 내부 블록의 ||까지 잘라버림
       const rawCells = splitCells(trimmed);
-
       const cells = [];
       for (let i = 0; i < rawCells.length; i++) {
-        // Namuwiki 테이블은 보통 시작과 끝에 ||가 있어서, split 결과의 첫/끝이 빈 문자열일 수 있음
-        // 단, splitCells는 정확히 구분자 사이의 텍스트만 가져오므로
-        // "|| a || b ||" -> ["", " a ", " b ", ""]
+        // 앞뒤의 빈 || 제거
         if (i === 0 && rawCells[i] === "" && trimmed.startsWith("||")) continue;
         if (i === rawCells.length - 1 && rawCells[i].trim() === "" && trimmed.endsWith("||")) continue;
         cells.push(parseCellAttributes(rawCells[i]));
@@ -985,7 +971,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       width: "auto",
       maxWidth: "100%",
       display: "table",
-      marginBottom: "10px",
+      // marginBottom: "10px",
     };
 
     const colStyles: React.CSSProperties[] = [];
@@ -994,6 +980,16 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     if (rows.length > 0) {
       rows.forEach((r) => maxCols = Math.max(maxCols, r.length));
 
+      // 모든 행의 모든 셀을 순회하며 테이블 전체 스타일(tablewidth 등)을 수집하여 병합
+      rows.forEach((cells) => {
+        cells.forEach((cell) => {
+          if (cell.tableStyle && Object.keys(cell.tableStyle).length > 0) {
+            containerStyle = { ...containerStyle, ...cell.tableStyle };
+          }
+        });
+      });
+
+      // 컬럼 스타일 수집
       rows.forEach((cells) => {
         cells.forEach((cell, cIdx) => {
           if (Object.keys(cell.colStyle).length > 0) {
@@ -1001,13 +997,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           }
         });
       });
-
-      if (rows[0].length > 0) {
-        const first = rows[0][0];
-        if (first.tableStyle && Object.keys(first.tableStyle).length > 0) {
-          containerStyle = { ...containerStyle, ...first.tableStyle };
-        }
-      }
     }
 
     const isFloat = containerStyle.float === "left" || containerStyle.float === "right";
@@ -1021,6 +1010,11 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
       : { marginBottom: "10px" };
 
+    /* if (containerStyle.width === "100%" && !isFloat) {
+        wrapperStyle.width = "100%";
+        wrapperStyle.display = "block"; 
+    } */
+
     const tableStyleCleaned = { ...containerStyle };
     if (isFloat) {
       delete tableStyleCleaned.float;
@@ -1030,7 +1024,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
     return (
       <div
-        className={`overflow-x-auto my-4 ${isFloat ? "inline-block" : "w-full block"}`}
+        className={`overflow-x-auto my-2 ${isFloat ? "inline-block" : "w-full block"}`}
         style={wrapperStyle}
         key={getKey("table-wrap")}
       >
@@ -1189,8 +1183,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     );
   }
 
-  // =================================================================================
-
   const renderedContent: React.ReactNode[] = [];
   let i = 0;
 
@@ -1305,8 +1297,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
 
       while (j < lines.length) {
         const curr = lines[j];
-        
-        // [FIX] Depth 체크 로직 추가: 
+
         // 테이블 내부 셀에 {{{ ... }}} 가 열려있으면 줄이 ||로 시작 안 해도 테이블의 일부로 간주
         const open = (curr.match(/\{\{\{/g) || []).length;
         const close = (curr.match(/\}\}\}/g) || []).length;
@@ -1348,7 +1339,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
                   <a
                     href={`#r${num}`}
                     className="text-[#0275d8] shrink-0 hover:!underline min-w-[20px] text-right"
-                    title="본문으로 이동"
                   >
                     [{num}]
                   </a>
