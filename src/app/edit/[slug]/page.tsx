@@ -1,5 +1,6 @@
 import { getWikiPage } from "@/app/actions";
 import EditForm from "@/components/EditForm";
+import SlugTitle from "@/components/SlugTitle";
 import Link from "next/link";
 import { FaAnchor } from "react-icons/fa";
 import { FaCircleArrowRight, FaTrashCan } from "react-icons/fa6";
@@ -22,26 +23,12 @@ export default async function EditPage({ params }: { params: Promise<{ slug: str
   const decodedSlug = decodeURIComponent(slug);
   const page = await getWikiPage(slug);
   const encodedSlug = encodeURIComponent(decodedSlug);
-  const colonIndex = decodedSlug.indexOf(":");
 
   return (
     <div className="p-5 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       {/* 상단 헤더 및 버튼 그룹 */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
-        <a href={`/w/${decodedSlug}`} className="hover:!underline">
-          <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">
-            {colonIndex !== -1 ? (
-              <>
-                <span style={{ boxShadow: "inset 0 -0.5rem 0 #d4f0e3" }}>
-                  {decodedSlug.substring(0, colonIndex)}
-                </span>
-                {decodedSlug.substring(colonIndex)}
-              </>
-            ) : (
-              decodedSlug
-            )}
-          </h1>
-        </a>
+        <SlugTitle slug={decodedSlug}/>
 
         <div className="flex">
           {/* 역링크 */}
