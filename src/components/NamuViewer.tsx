@@ -909,23 +909,40 @@ export default function NamuViewer({
           const filename = target.split(":")[1];
           const options = optionsRaw.split("|");
           let width: string | undefined = undefined;
+          let align: 'left' | 'center' | 'right' | undefined = undefined;
           options.forEach((opt) => {
             const trimmed = opt.trim();
             if (trimmed.startsWith("width=")) {
               const val = trimmed.split("=")[1];
               width = /^\d+$/.test(val) ? `${val}px` : val;
             }
+            if (trimmed.startsWith("align=")) {
+              const val = trimmed.split("=")[1].toLowerCase();
+              if (val === "center" || val === "left" || val === "right") {
+                align = val as any;
+              }
+            }
           });
+
+          let containerClass = "inline-block align-middle mx-0.5";
+          if (align === "center") {
+            containerClass = "flex justify-center w-full my-2";
+          } else if (align === "left") {
+            containerClass = "float-left mr-2 my-1";
+          } else if (align === "right") {
+            containerClass = "float-right ml-2 my-1";
+          }
+
           return [
             ...parseInline(before),
             <span
               key={getKey("file")}
-              className="flex justify-center items-center w-full align-middle my-1"
+              className={containerClass}
             >
               <img
                 src={`/uploads/${filename}`}
                 alt={filename}
-                style={{ width }}
+                style={{ width: width || "auto" }}
                 className="max-w-full h-auto"
               />
             </span>,
