@@ -419,6 +419,15 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     const delRegex = /~~(.*?)~~/;
     const delMatch = delRegex.exec(text);
 
+    const dashDelRegex = /--(.*?)--/;
+    const dashDelMatch = dashDelRegex.exec(text);
+
+    const supRegex = /\^\^(.*?)\^\^/;
+    const supMatch = supRegex.exec(text);
+
+    const subRegex = /,,(.*?),,/;
+    const subMatch = subRegex.exec(text);
+
     const candidates = [
       { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
       { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
@@ -427,6 +436,9 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       { type: "bold", idx: boldMatch ? boldMatch.index : Infinity, match: boldMatch },
       { type: "underline", idx: underlineMatch ? underlineMatch.index : Infinity, match: underlineMatch },
       { type: "del", idx: delMatch ? delMatch.index : Infinity, match: delMatch },
+      { type: "dashDel", idx: dashDelMatch ? dashDelMatch.index : Infinity, match: dashDelMatch },
+      { type: "sup", idx: supMatch ? supMatch.index : Infinity, match: supMatch },
+      { type: "sub", idx: subMatch ? subMatch.index : Infinity, match: subMatch },
     ].sort((a, b) => a.idx - b.idx);
 
     for (const candidate of candidates) {
@@ -557,7 +569,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
             ];
           }
 
-          // 일반 텍스트
           return [
             ...parseInline(before),
             ...parseInline(rawContent),
@@ -717,6 +728,48 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
           ...parseInline(after),
         ];
       }
+
+      if (candidate.type === "dashDel" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const inner = match[1];
+        const after = text.slice(match.index + match[0].length);
+        return [
+          ...parseInline(before),
+          <del key={getKey("dash-del")} className="text-gray-400">
+            {parseInline(inner)}
+          </del>,
+          ...parseInline(after),
+        ];
+      }
+
+      if (candidate.type === "sup" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const inner = match[1];
+        const after = text.slice(match.index + match[0].length);
+        return [
+          ...parseInline(before),
+          <sup key={getKey("sup")}>
+            {parseInline(inner)}
+          </sup>,
+          ...parseInline(after),
+        ];
+      }
+
+      if (candidate.type === "sub" && candidate.match) {
+        const match = candidate.match;
+        const before = text.slice(0, match.index);
+        const inner = match[1];
+        const after = text.slice(match.index + match[0].length);
+        return [
+          ...parseInline(before),
+          <sub key={getKey("sub")}>
+            {parseInline(inner)}
+          </sub>,
+          ...parseInline(after),
+        ];
+      }
     }
 
     return [text];
@@ -746,9 +799,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       return /^\d+$/.test(trimVal) ? `${trimVal}px` : trimVal;
     };
 
-    // 태그 파싱 루프
     while (true) {
-      // 앞쪽 공백 제거 후 태그 확인
       const trimmedCheck = content.trimStart();
       if (!trimmedCheck.startsWith("<")) break;
 
@@ -759,10 +810,15 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       const lowerInner = tagContent.toLowerCase().trim();
       let handled = false;
 
-      // --- 속성 처리 로직 ---
       if (lowerInner.startsWith("tablebordercolor=")) {
         const v = parseColorValue(tagContent.split("=")[1]);
         tableStyle.border = `2px solid ${v}`;
+        handled = true;
+      }
+      else if (lowerInner.startsWith("tablebgcolor=")) {
+        const v = parseColorValue(tagContent.split("=")[1]);
+        tableStyle.backgroundColor = v;
+        style.backgroundColor = v; 
         handled = true;
       }
       else if (lowerInner.startsWith("tablealign=")) {
@@ -798,6 +854,7 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
               tableStyle.borderColor = v;
             } else if (k === "bgcolor") {
               tableStyle.backgroundColor = v;
+              style.backgroundColor = v;
             } 
             else if (k === "width") {
               tableStyle.width = formatSize(v);
@@ -893,15 +950,12 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
       }
 
       if (handled) {
-        // 태그가 처리되었다면 원본 content에서 해당 태그 제거 (공백 포함 위치 찾기)
-        // trimStart() 하기 전의 원본 content에서 태그 위치를 찾아야 함
         const tagString = "<" + tagContent + ">";
         const tagIndex = content.indexOf(tagString);
         
         if (tagIndex !== -1) {
             content = content.slice(tagIndex + tagString.length);
         } else {
-            // 혹시라도 indexOf 실패 시 (trim 등의 이유로), 루프 탈출
             break;
         }
       } else {
@@ -929,7 +983,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     let currentBuffer = "";
     let braceDepth = 0;
 
-    // 1. 줄 병합 (멀티라인 셀 지원)
     for (const line of lines) {
         const open = (line.match(/\{\{\{/g) || []).length;
         const close = (line.match(/\}\}\}/g) || []).length;
@@ -950,13 +1003,11 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     }
     if (currentBuffer) mergedRows.push(currentBuffer);
 
-    // 2. 행 및 셀 파싱
     const rows = mergedRows.map((line) => {
       const trimmed = line.trim();
       const rawCells = splitCells(trimmed);
       const cells = [];
       for (let i = 0; i < rawCells.length; i++) {
-        // 앞뒤의 빈 || 제거
         if (i === 0 && rawCells[i] === "" && trimmed.startsWith("||")) continue;
         if (i === rawCells.length - 1 && rawCells[i].trim() === "" && trimmed.endsWith("||")) continue;
         cells.push(parseCellAttributes(rawCells[i]));
@@ -980,7 +1031,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
     if (rows.length > 0) {
       rows.forEach((r) => maxCols = Math.max(maxCols, r.length));
 
-      // 모든 행의 모든 셀을 순회하며 테이블 전체 스타일(tablewidth 등)을 수집하여 병합
       rows.forEach((cells) => {
         cells.forEach((cell) => {
           if (cell.tableStyle && Object.keys(cell.tableStyle).length > 0) {
@@ -989,7 +1039,6 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         });
       });
 
-      // 컬럼 스타일 수집
       rows.forEach((cells) => {
         cells.forEach((cell, cIdx) => {
           if (Object.keys(cell.colStyle).length > 0) {
@@ -1010,10 +1059,10 @@ export default function NamuViewer({ content, existingSlugs = [] }: { content: s
         }
       : { marginBottom: "10px" };
 
-    /* if (containerStyle.width === "100%" && !isFloat) {
+    if (containerStyle.width === "100%" && !isFloat) {
         wrapperStyle.width = "100%";
         wrapperStyle.display = "block"; 
-    } */
+    }
 
     const tableStyleCleaned = { ...containerStyle };
     if (isFloat) {
