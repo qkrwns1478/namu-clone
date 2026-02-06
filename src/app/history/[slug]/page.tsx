@@ -5,10 +5,28 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params
   const decodedSlug = decodeURIComponent(slug)
   const history = await getWikiHistory(slug)
+  const colonIndex = decodedSlug.indexOf(":");
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">역사: {decodedSlug}</h1>
+    <div className="p-6 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
+      <div className="mb-4 flex items-center gap-2">
+        <a href={`/w/${decodedSlug}`} className="hover:!underline">
+          <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">
+            {colonIndex !== -1 ? (
+              <>
+                <span style={{ boxShadow: "inset 0 -0.5rem 0 #d4f0e3" }}>
+                  {decodedSlug.substring(0, colonIndex)}
+                </span>
+                {decodedSlug.substring(colonIndex)}
+              </>
+            ) : (
+              decodedSlug
+            )}
+          </h1>
+        </a>
+        <span className='text-3xl font-bold text-[#373a3c]'>(문서 역사)</span>
+      </div>
+
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-100 text-gray-700">
@@ -42,11 +60,6 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
             ))}
           </tbody>
         </table>
-      </div>
-      <div className="mt-4">
-        <Link href={`/w/${slug}`} className="text-[#00A495] hover:underline">
-          ← 문서로 돌아가기
-        </Link>
       </div>
     </div>
   )

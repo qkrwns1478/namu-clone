@@ -165,7 +165,7 @@ export default async function WikiPage({ params }: Props) {
             <Link href="#" className={btnToolMiddleClass}>
               <FaMessage size={15} /> 토론
             </Link>
-            <Link href={`/w/${encodedSlug}/history`} className={btnToolRightClass}>
+            <Link href={`/history/${encodedSlug}`} className={btnToolRightClass}>
               <FaBook size={15} /> 역사
             </Link>
           </div>
