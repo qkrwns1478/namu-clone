@@ -166,15 +166,23 @@ export default async function WikiPage({ params }: Props) {
       {linkedCategories.length > 0 && (
         <div className="mb-[14px] px-2 py-1 rounded border border-[#e5e7eb] bg-white text-sm flex flex-wrap items-center gap-2">
           <span className="text-gray-500 text-xs">분류:</span>
-          {linkedCategories.map((cat) => (
-            <Link
-              key={cat}
-              href={`/w/${encodeURIComponent("분류:" + cat)}`}
-              className="text-[#0275d8] hover:underline border-r pr-2 last:border-0 last:pr-0 border-gray-300"
-            >
-              {cat}
-            </Link>
-          ))}
+          {linkedCategories.map((cat) => {
+            const hasBlur = cat.includes('#blur');
+            const cleanName = hasBlur ? cat.replace('#blur', '') : cat;
+
+            return (
+              <Link
+                key={cat}
+                href={`/w/${encodeURIComponent("분류:" + cleanName)}`}
+                className={`text-[#0275d8] hover:!underline border-r pr-2 last:border-0 last:pr-0 border-gray-300 transition-all duration-200 ${
+                  hasBlur ? 'text-transparent [text-shadow:0_0_6px_#0275d8]' : ''
+                }`}
+                title={`분류:${cleanName}`}
+              >
+                {cleanName}
+              </Link>
+            );
+          })}
         </div>
       )}
 
