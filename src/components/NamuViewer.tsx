@@ -18,7 +18,7 @@ type TocItem = {
 const IncludeRenderer = ({
   rawArgs,
   fetchContent,
-  existingSlugs,
+  existingSlugs = [],
   currentSlug,
   visitedSlugs = new Set<string>(),
   depth = 0,
@@ -34,9 +34,31 @@ const IncludeRenderer = ({
   const [loading, setLoading] = useState(true);
   const MAX_INCLUDE_DEPTH = 5;
 
+  // 인자 및 파라미터 미리 파싱
+  const args = rawArgs.split(",");
+  const slug = args[0].trim();
+  const params: { [key: string]: string } = {};
+
+  for (let i = 1; i < args.length; i++) {
+    const parts = args[i].split("=");
+    if (parts.length >= 2) {
+      const key = parts[0].trim();
+      const val = parts.slice(1).join("=").trim();
+      params[key] = val;
+    }
+  }
+
+  const getLinkStyle = (target: string) => {
+    const isExist = existingSlugs.includes(target) || target === currentSlug;
+    return isExist ? "text-[#0275d8]" : "text-[#FF0000]";
+  };
+
   useEffect(() => {
-    const args = rawArgs.split(",");
-    const slug = args[0].trim();
+    // 특수 틀인 경우 fetch를 건너뜀
+    if (slug === "틀:상세 내용" || slug === "틀:상위 문서") {
+      setLoading(false);
+      return;
+    }
 
     if (!fetchContent || depth >= MAX_INCLUDE_DEPTH || visitedSlugs.has(slug)) {
       setLoading(false);
@@ -44,17 +66,6 @@ const IncludeRenderer = ({
         console.warn("Circular include detected:", slug);
       }
       return;
-    }
-
-    const params: { [key: string]: string } = {};
-
-    for (let i = 1; i < args.length; i++) {
-      const parts = args[i].split("=");
-      if (parts.length >= 2) {
-        const key = parts[0].trim();
-        const val = parts.slice(1).join("=").trim();
-        params[key] = val;
-      }
     }
 
     fetchContent(slug)
@@ -73,10 +84,45 @@ const IncludeRenderer = ({
         console.error("Include fetch error:", err);
       })
       .finally(() => setLoading(false));
-  }, [rawArgs, fetchContent]);
+  }, [slug, rawArgs, fetchContent]);
 
   if (loading) return <span className="text-gray-400 text-xs">[Loading...]</span>;
-  if (!content) return <span className="text-red-500 text-xs">[Include Error: {rawArgs.split(",")[0]}]</span>;
+
+  // --- 특수 틀 대응 로직 ---
+  if (slug === "틀:상세 내용") {
+    const target = params["문서명"] || "내용";
+    const linkColor = getLinkStyle(target);
+    return (
+      <div className="flex items-center gap-2 text-[15px]">
+        <img src="/images/상세내용.svg" className="w-[21px] h-[21px]"/>
+        <span>
+          자세한 내용은{" "}
+          <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>
+            {target}
+          </Link>{" "}
+          문서를 참고하십시오.
+        </span>
+      </div>
+    );
+  }
+
+  if (slug === "틀:상위 문서") {
+    const target = params["문서명1"] || "상위 문서";
+    const linkColor = getLinkStyle(target);
+    return (
+      <div className="flex items-center gap-2 text-[15px]">
+        <img src="/images/상위문서.svg" className="w-[21px] h-[21px]"/>
+        <span>
+          상위 문서:{" "}
+          <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>
+            {target}
+          </Link>
+        </span>
+      </div>
+    );
+  }
+
+  if (!content) return <span className="text-red-500 text-xs">[Include Error: {slug}]</span>;
 
   return (
     <div>
@@ -85,7 +131,7 @@ const IncludeRenderer = ({
         slug={currentSlug}
         existingSlugs={existingSlugs}
         fetchContent={fetchContent}
-        visitedSlugs={new Set([...visitedSlugs, rawArgs.split(",")[0].trim()])}
+        visitedSlugs={new Set([...visitedSlugs, slug])}
         includeDepth={depth + 1}
       />
     </div>
@@ -219,7 +265,44 @@ export default function NamuViewer({
   includeDepth?: number;
 }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    const initialSet = new Set<string>();
+    const lines = content.split("\n");
+    const counters = [0, 0, 0, 0, 0, 0];
+
+    lines.forEach((rawLine) => {
+      const line = rawLine.replace(/\r$/, "").trim();
+      // #이 포함된 헤더 정규식: (=+)\s*#\s*(.+?)\s*#\s*\1
+      const headerMatch = line.match(/^(=+)\s*#\s*(.+?)\s*#\s*\1$/);
+      
+      if (headerMatch) {
+        const level = headerMatch[1].length;
+        if (level >= 1) {
+          const counterIndex = level - 2;
+          if (counterIndex >= 0) {
+            counters[counterIndex]++;
+            for (let i = counterIndex + 1; i < counters.length; i++) counters[i] = 0;
+            const numberParts = [];
+            for (let i = 0; i <= counterIndex; i++) numberParts.push(counters[i]);
+            const id = `s-${numberParts.join(".")}`;
+            initialSet.add(id); // 초기 접힘 목록에 추가
+          }
+        }
+      } else {
+        // 일반 헤더인 경우에도 카운터는 올려줘야 ID 정합성이 맞음
+        const normalMatch = line.match(/^(=+)\s*(.+?)\s*\1$/);
+        if (normalMatch) {
+          const level = normalMatch[1].length;
+          const counterIndex = level - 2;
+          if (counterIndex >= 0) {
+            counters[counterIndex]++;
+            for (let i = counterIndex + 1; i < counters.length; i++) counters[i] = 0;
+          }
+        }
+      }
+    });
+    return initialSet;
+  });
 
   const existingSet = useMemo(() => {
     const set = new Set(existingSlugs);
@@ -247,25 +330,20 @@ export default function NamuViewer({
     const hMap: { [lineIndex: number]: string } = {};
     const counters = [0, 0, 0, 0, 0, 0];
 
-    const lines = content.split("\n");
-    lines.forEach((rawLine, lineIndex) => {
+    content.split("\n").forEach((rawLine, lineIndex) => {
       const line = rawLine.replace(/\r$/, "").trim();
-      const headerMatch = line.match(/^(=+)\s*(.+?)\s*\1$/);
+      const headerMatch = line.match(/^(=+)\s*(#?)\s*(.+?)\s*\2\s*\1$/);
 
       if (headerMatch) {
         const level = headerMatch[1].length;
-        const text = headerMatch[2];
+        const text = headerMatch[3];
 
         if (level >= 1) {
           const counterIndex = level - 2;
           if (counterIndex >= 0) {
             counters[counterIndex]++;
             for (let i = counterIndex + 1; i < counters.length; i++) counters[i] = 0;
-
-            const numberParts = [];
-            for (let i = 0; i <= counterIndex; i++) numberParts.push(counters[i]);
-
-            const numberStr = numberParts.join(".") + ".";
+            const numberStr = counters.slice(0, counterIndex + 1).join(".") + ".";
             const id = `s-${numberStr.slice(0, -1)}`;
 
             items.push({ id, text, level, numberStr });
@@ -1316,10 +1394,10 @@ export default function NamuViewer({
       return <div key={getKey("clearfix")} className="clear-both" />;
     }
 
-    const headerMatch = line.match(/^(=+)\s*(.+?)\s*\1$/);
+    const headerMatch = line.match(/^(=+)\s*(#?)\s*(.+?)\s*\2\s*\1$/);
     if (headerMatch) {
       const level = headerMatch[1].length;
-      const text = headerMatch[2];
+      const text = headerMatch[3];
       const sizes: { [key: number]: string } = {
         1: "text-3xl mt-6 mb-4 border-b-2 pb-2",
         2: "text-2xl mt-5 mb-3 border-b pb-1 font-bold",
