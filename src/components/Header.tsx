@@ -62,16 +62,6 @@ export default function Header() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -196,7 +186,7 @@ export default function Header() {
                       <span className="text-lg">{user.username}</span>
                     </div>
                     <Link
-                      href={`/contributions/${user.username}`}
+                      href={`/contributions/${encodeURIComponent(user.username)}`}
                       className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
                     >
                       <History size={16} /> 내 기여 내역

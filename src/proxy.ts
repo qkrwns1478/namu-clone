@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
-
 export async function proxy(request: NextRequest) {
+  const rawSecret = process.env.JWT_SECRET;
+  if (!rawSecret) {
+    console.error("JWT_SECRET is not set");
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+  const JWT_SECRET = new TextEncoder().encode(rawSecret);
   const token = request.cookies.get("session")?.value;
   const { pathname } = request.nextUrl;
 

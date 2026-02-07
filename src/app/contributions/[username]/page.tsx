@@ -19,7 +19,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ContributionsPage({ params, searchParams }: Props) {
   const { username } = await params;
   const { page: pageStr } = await searchParams;
-  const currentPage = parseInt(pageStr || "1") || 1;
+  const parsedPage = Number.parseInt(pageStr ?? "1", 10);
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
   const decodedUsername = decodeURIComponent(username);
   const { contributions, total, totalPages } = await getUserContributions(decodedUsername, currentPage);
@@ -66,7 +67,7 @@ export default async function ContributionsPage({ params, searchParams }: Props)
           <div className="flex justify-center items-center gap-4 mt-8">
             {currentPage > 1 && (
               <Link
-                href={`/contributions/${username}?page=${currentPage - 1}`}
+                href={`/contributions/${encodeURIComponent(username)}?page=${currentPage - 1}`}
                 className="px-4 py-2 border border-[#ccc] rounded text-sm hover:bg-gray-50 transition-colors"
               >
                 이전
@@ -79,7 +80,7 @@ export default async function ContributionsPage({ params, searchParams }: Props)
 
             {currentPage < totalPages && (
               <Link
-                href={`/contributions/${username}?page=${currentPage + 1}`}
+                href={`/contributions/${encodeURIComponent(username)}?page=${currentPage + 1}`}
                 className="px-4 py-2 border border-[#ccc] rounded text-sm hover:bg-gray-50 transition-colors"
               >
                 다음

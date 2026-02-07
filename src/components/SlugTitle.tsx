@@ -2,9 +2,10 @@
 
 export default function SlugTitle({ slug }: { slug: string }) {
   const colonIndex = slug.indexOf(":");
+  const hrefSlug = encodeURIComponent(slug);
 
   return (
-    <a href={`/w/${slug}`} className="hover:!underline">
+    <a href={`/w/${hrefSlug}`} className="hover:!underline">
       <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">
         {colonIndex !== -1 ? (
           <>

@@ -5,13 +5,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { writeFile, access } from "fs/promises";
-import { join, parse } from "path";
+import { join, parse, basename } from "path";
 import { constants } from "fs";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+const rawSecret = process.env.JWT_SECRET;
+if (!rawSecret) throw new Error("JWT_SECRET is required");
+const JWT_SECRET = new TextEncoder().encode(rawSecret);
+
 const prisma = new PrismaClient();
 
 // Include 매크로용 문서 내용 조회
@@ -234,7 +237,10 @@ export async function uploadImage(formData: FormData) {
     const buffer = Buffer.from(bytes);
 
     // 1. 기본 파일명 정리 (공백 -> 언더바)
-    let filename = file.name.replace(/\s/g, "_");
+    const originalName = file.name;
+    let filename = basename(originalName)
+      .replace(/\s/g, "_")
+      .replace(/[^a-zA-Z0-9._-]/g, "_");
     const uploadDir = join(process.cwd(), "public/uploads");
     let savePath = join(uploadDir, filename);
 
@@ -474,8 +480,9 @@ export async function logout() {
 
 // 사용자 문서 기역 내역 보기
 export async function getUserContributions(username: string, page: number = 1) {
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
   const pageSize = 25;
-  const skip = (page - 1) * pageSize;
+  const skip = (safePage - 1) * pageSize;
 
   const whereCondition = {
     OR: [{ author: { username: username } }, { ipAddress: username }],

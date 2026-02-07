@@ -18,6 +18,7 @@ export default function SignUpPage() {
             name="username"
             type="text"
             required
+            autoComplete="username"
             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#00a69c]"
             placeholder="아이디 입력"
           />
@@ -29,14 +30,13 @@ export default function SignUpPage() {
             name="password"
             type="password"
             required
+            autoComplete="new-password"
             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#00a69c]"
             placeholder="비밀번호 입력"
           />
         </div>
 
         {state?.message && <p className="text-red-500 text-sm mt-1">{state.message}</p>}
-
-        {state?.success && <p className="text-green-600 text-sm mt-1">회원가입 성공! 로그인 해주세요.</p>}
 
         <button
           type="submit"

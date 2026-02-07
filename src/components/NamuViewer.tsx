@@ -94,7 +94,7 @@ const IncludeRenderer = ({
     const linkColor = getLinkStyle(target);
     return (
       <div className="flex items-center gap-2 text-[15px]">
-        <img src="/images/상세내용.svg" className="w-[21px] h-[21px]" />
+        <img src="/images/상세내용.svg" alt="" aria-hidden="true" className="w-[21px] h-[21px]" />
         <span>
           자세한 내용은{" "}
           <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>
@@ -111,7 +111,7 @@ const IncludeRenderer = ({
     const linkColor = getLinkStyle(target);
     return (
       <div className="flex items-center gap-2 text-[15px]">
-        <img src="/images/상위문서.svg" className="w-[21px] h-[21px]" />
+        <img src="/images/상위문서.svg" alt="" aria-hidden="true" className="w-[21px] h-[21px]" />
         <span>
           상위 문서:{" "}
           <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>

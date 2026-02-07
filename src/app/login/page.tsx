@@ -18,6 +18,7 @@ export default function LoginPage() {
             name="username"
             type="text"
             required
+            autoComplete="username"
             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#00a69c]"
             placeholder="아이디 입력"
           />
@@ -29,6 +30,7 @@ export default function LoginPage() {
             name="password"
             type="password"
             required
+            autoComplete="current-password"
             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#00a69c]"
             placeholder="비밀번호 입력"
           />
