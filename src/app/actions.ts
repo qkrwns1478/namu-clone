@@ -469,21 +469,39 @@ export async function logout() {
 }
 
 // 사용자 문서 기역 내역 보기
-export async function getUserContributions(username: string) {
-  return await prisma.wikiRevision.findMany({
-    where: {
-      author: {
-        username: username
-      }
-    },
-    include: {
-      page: {
-        select: { slug: true }
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 50
-  })
+export async function getUserContributions(username: string, page: number = 1) {
+  const pageSize = 25;
+  const skip = (page - 1) * pageSize;
+
+  const whereCondition = {
+    OR: [
+      { author: { username: username } },
+      { ipAddress: username }
+    ]
+  };
+
+  const [contributions, total] = await Promise.all([
+    prisma.wikiRevision.findMany({
+      where: whereCondition,
+      include: {
+        page: {
+          select: { slug: true }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip: skip,
+      take: pageSize
+    }),
+    prisma.wikiRevision.count({
+      where: whereCondition
+    })
+  ]);
+
+  return {
+    contributions,
+    total,
+    totalPages: Math.ceil(total / pageSize)
+  };
 }
