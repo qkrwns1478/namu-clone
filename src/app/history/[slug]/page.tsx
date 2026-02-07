@@ -18,6 +18,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-100 text-gray-700">
             <tr>
+              <th className="p-3 w-16">번호</th>
               <th className="p-3">수정일시</th>
               <th className="p-3">수정자</th>
               <th className="p-3">기능</th>
@@ -26,6 +27,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
           <tbody>
             {history.map((rev) => (
               <tr key={rev.id} className="border-t hover:bg-gray-50">
+                <td className="p-3 text-gray-500">r{rev.rev}</td>
                 <td className="p-3">{rev.createdAt.toLocaleString()}</td>
                 <td className="p-3">
                   <div className="flex flex-col">

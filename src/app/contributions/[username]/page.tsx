@@ -44,13 +44,12 @@ export default async function ContributionsPage({
                 <li key={rev.id} className="p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Link 
-                        href={`/w/${encodeURIComponent(rev.page.slug)}`}
-                        className="text-[#00a69c] font-bold hover:underline"
-                      >
+                      <Link href={`/w/${encodeURIComponent(rev.page.slug)}`} className="...">
                         {rev.page.slug}
                       </Link>
-                      <span className="text-xs text-gray-400">(r{rev.id})</span>
+                      <span className="text-xs text-gray-400">
+                        (r{rev.rev})
+                      </span>
                     </div>
                     <div className="text-xs text-gray-500">
                       {format(new Date(rev.createdAt), 'yyyy-MM-dd HH:mm:ss')}

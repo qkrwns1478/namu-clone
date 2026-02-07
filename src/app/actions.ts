@@ -54,12 +54,20 @@ export async function getWikiHistory(slug: string) {
       page: { slug: decodedSlug }
     },
     include: {
-      author: {
-        select: { username: true }
-      }
+      author: { select: { username: true } }
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { rev: 'desc' },
   })
+}
+
+// 리비전 번호 계산 헬퍼 함수
+async function getNextRev(tx: any, pageId: number) {
+  const lastRev = await tx.wikiRevision.findFirst({
+    where: { pageId },
+    orderBy: { rev: 'desc' },
+    select: { rev: true }
+  })
+  return (lastRev?.rev || 0) + 1
 }
 
 // 문서 저장
@@ -116,8 +124,10 @@ export async function saveWikiPage(formData: FormData) {
 
       // 5. 리비전 저장
       const session = await getSession()
+      const nextRev = await getNextRev(tx, page.id)
       await tx.wikiRevision.create({
         data: {
+          rev: nextRev,
           content,
           comment: comment || '문서 수정',
           ipAddress: session ? null : ip,
@@ -178,29 +188,28 @@ export async function searchDocs(query: string) {
 }
 // 특정 리비전으로 되돌리기
 export async function revertWikiPage(slug: string, revisionId: number) {
-  // 1. 되돌리려는 과거 리비전 데이터 가져오기
   const oldRevision = await prisma.wikiRevision.findUnique({
     where: { id: revisionId }
   })
-
   if (!oldRevision) throw new Error("리비전을 찾을 수 없습니다.")
 
-  // 2. 현재 문서를 과거 내용으로 업데이트 (새로운 리비전 생성 포함)
+  const session = await getSession()
+  const headerList = await headers() 
+  const ip = headerList.get('x-forwarded-for') || '127.0.0.1'
+
   await prisma.$transaction(async (tx) => {
-    // 페이지 본문 업데이트
     const page = await tx.wikiPage.update({
       where: { slug },
       data: { content: oldRevision.content }
     })
 
-    // 되돌리기 기록도 '새로운 리비전'으로 저장 (누가 되돌렸는지 알기 위해)
-    const headerList = await headers() 
-    const ip = headerList.get('x-forwarded-for') || '127.0.0.1'
-    const session = await getSession()
+    const nextRev = await getNextRev(tx, page.id)
+
     await tx.wikiRevision.create({
       data: {
+        rev: nextRev,
         content: oldRevision.content,
-        comment: `(되돌리기) r${revisionId} 버전으로 복구`,
+        comment: `(되돌리기) r${oldRevision.rev} 버전으로 복구`,
         pageId: page.id,
         ipAddress: session ? null : ip,
         authorId: session?.userId,
@@ -300,25 +309,26 @@ export async function moveWikiPage(prevState: any, formData: FormData) {
     return { success: false, message: '이미 존재하는 문서 이름입니다.' }
   }
 
+  const session = await getSession()
   const headerList = await headers() 
   const ip = headerList.get('x-forwarded-for') || '127.0.0.1'
 
   try {
     await prisma.$transaction(async (tx) => {
-      // 2. 페이지 슬러그 업데이트 (이름 변경)
       const page = await tx.wikiPage.update({
         where: { slug: oldSlug },
         data: { slug: newSlug }
       })
 
-      // 3. 이동 기록 남기기 (리비전 생성)
-      const session = await getSession()
+      const nextRev = await getNextRev(tx, page.id)
+
       await tx.wikiRevision.create({
         data: {
+          rev: nextRev,
           pageId: page.id,
-          content: page.content, // 내용은 그대로
+          content: page.content,
           comment: `(문서 이동) ${oldSlug} → ${newSlug} ${comment ? `: ${comment}` : ''}`,
-          ipAddress: ip,
+          ipAddress: session ? null : ip,
           authorId: session?.userId,
         }
       })
