@@ -1,17 +1,29 @@
-import { getWikiHistory, revertWikiPage } from '@/app/actions'
+import { getWikiHistory, revertWikiPage } from "@/app/actions";
 import SlugTitle from "@/components/SlugTitle";
+import { Metadata } from "next";
+
+type Props = {
+  params: Promise<{ slug: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
+  return {
+    title: `${decodedSlug} (역사) - 나무위키`,
+  };
+}
 
 export default async function HistoryPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const decodedSlug = decodeURIComponent(slug)
-  const history = await getWikiHistory(slug)
-  const colonIndex = decodedSlug.indexOf(":");
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
+  const history = await getWikiHistory(slug);
 
   return (
     <div className="p-6 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       <div className="mb-4 flex items-center gap-2">
-        <SlugTitle slug={decodedSlug}/>
-        <span className='text-3xl font-bold text-[#373a3c]'>(문서 역사)</span>
+        <SlugTitle slug={decodedSlug} />
+        <span className="text-3xl font-bold text-[#373a3c]">(문서 역사)</span>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -32,16 +44,18 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
                 <td className="p-3">
                   <div className="flex flex-col">
                     <span className="font-bold text-gray-700">
-                      {rev.author?.username || rev.ipAddress || 'Unknown'}
+                      {rev.author?.username || rev.ipAddress || "Unknown"}
                     </span>
-                    <span className="text-gray-500 text-xs">{rev.comment || '(-)'}</span>
+                    <span className="text-gray-500 text-xs">{rev.comment || "(-)"}</span>
                   </div>
                 </td>
                 <td className="p-3">
-                  <form action={async () => {
-                      'use server'
-                      await revertWikiPage(decodedSlug, rev.id)
-                  }}>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await revertWikiPage(decodedSlug, rev.id);
+                    }}
+                  >
                     <button className="text-blue-500 hover:underline text-xs" type="submit">
                       이 버전으로 되돌리기
                     </button>
@@ -53,5 +67,5 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
         </table>
       </div>
     </div>
-  )
+  );
 }

@@ -29,7 +29,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const CHO_SUNG = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+const CHO_SUNG = [
+  "ㄱ",
+  "ㄲ",
+  "ㄴ",
+  "ㄷ",
+  "ㄸ",
+  "ㄹ",
+  "ㅁ",
+  "ㅂ",
+  "ㅃ",
+  "ㅅ",
+  "ㅆ",
+  "ㅇ",
+  "ㅈ",
+  "ㅉ",
+  "ㅊ",
+  "ㅋ",
+  "ㅌ",
+  "ㅍ",
+  "ㅎ",
+];
 
 function getInitial(char: string) {
   const code = char.charCodeAt(0);
@@ -111,17 +131,17 @@ export default async function WikiPage({ params }: Props) {
     const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
     const targets = new Set<string>();
     let match;
-    
+
     // 본문을 스캔하여 링크 대상 추출
     while ((match = linkRegex.exec(page.content)) !== null) {
       let target = match[1];
       // 앵커(#)가 있는 경우 앞부분(문서명)만 추출
-      if (target.includes('#')) {
-        target = target.split('#')[0];
+      if (target.includes("#")) {
+        target = target.split("#")[0];
       }
       if (target) targets.add(target);
     }
-    
+
     // DB에서 존재 여부 조회
     if (targets.size > 0) {
       existingSlugs = await getExistingSlugs(Array.from(targets));
@@ -135,7 +155,7 @@ export default async function WikiPage({ params }: Props) {
       {/* 상단 툴바 */}
       <div className="flex justify-between">
         <div className="mb-4">
-          <SlugTitle slug={page.slug}/>
+          <SlugTitle slug={page.slug} />
           <div className="text-sm text-[#212529BF] mt-2">
             최근 수정 시각: {page.updatedAt.toLocaleString()}
           </div>
@@ -167,15 +187,17 @@ export default async function WikiPage({ params }: Props) {
         <div className="mb-[14px] px-2 py-1 rounded border border-[#e5e7eb] bg-white text-sm flex flex-wrap items-center gap-2">
           <span className="text-gray-500 text-xs">분류:</span>
           {linkedCategories.map((cat) => {
-            const hasBlur = cat.includes('#blur');
-            const cleanName = hasBlur ? cat.replace('#blur', '') : cat;
+            const hasBlur = cat.includes("#blur");
+            const cleanName = hasBlur ? cat.replace("#blur", "") : cat;
 
             return (
               <Link
                 key={cat}
                 href={`/w/${encodeURIComponent("분류:" + cleanName)}`}
                 className={`text-[#0275d8] hover:!underline border-r pr-2 last:border-0 last:pr-0 border-gray-300 ${
-                  hasBlur ? 'text-transparent [text-shadow:0_0_6px_#0275d8] hover:text-[#0275d8] hover:text-shadow-none' : ''
+                  hasBlur
+                    ? "text-transparent [text-shadow:0_0_6px_#0275d8] hover:text-[#0275d8] hover:text-shadow-none"
+                    : ""
                 }`}
                 title={`분류:${cleanName}`}
               >
@@ -188,19 +210,19 @@ export default async function WikiPage({ params }: Props) {
 
       {/* 본문 뷰어 */}
       <div className="min-h-[300px]">
-        <NamuViewer 
-          content={page.content} 
+        <NamuViewer
+          content={page.content}
           slug={decodedSlug}
-          existingSlugs={existingSlugs} 
-          fetchContent={fetchWikiContent} 
+          existingSlugs={existingSlugs}
+          fetchContent={fetchWikiContent}
         />
 
         {isCategoryPage && (
           <div className="mt-8">
-            <h2 className="font-bold text-2xl mb-1 text-[#373a3c] mb-6 pb-2 border-b border-[#ccc]">"{categoryName}" 분류에 속하는 문서</h2>
-            <div className="text-sm text-gray-500">
-              전체 {categoryDocs.length}개 문서
-            </div>
+            <h2 className="font-bold text-2xl mb-1 text-[#373a3c] mb-6 pb-2 border-b border-[#ccc]">
+              "{categoryName}" 분류에 속하는 문서
+            </h2>
+            <div className="text-sm text-gray-500">전체 {categoryDocs.length}개 문서</div>
 
             {categoryDocs.length === 0 ? (
               <p className="text-sm text-gray-500 p-2">이 분류에 속한 문서가 없습니다.</p>

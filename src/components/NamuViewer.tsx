@@ -94,7 +94,7 @@ const IncludeRenderer = ({
     const linkColor = getLinkStyle(target);
     return (
       <div className="flex items-center gap-2 text-[15px]">
-        <img src="/images/상세내용.svg" className="w-[21px] h-[21px]"/>
+        <img src="/images/상세내용.svg" className="w-[21px] h-[21px]" />
         <span>
           자세한 내용은{" "}
           <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>
@@ -111,7 +111,7 @@ const IncludeRenderer = ({
     const linkColor = getLinkStyle(target);
     return (
       <div className="flex items-center gap-2 text-[15px]">
-        <img src="/images/상위문서.svg" className="w-[21px] h-[21px]"/>
+        <img src="/images/상위문서.svg" className="w-[21px] h-[21px]" />
         <span>
           상위 문서:{" "}
           <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>
@@ -274,7 +274,7 @@ export default function NamuViewer({
       const line = rawLine.replace(/\r$/, "").trim();
       // #이 포함된 헤더 정규식: (=+)\s*#\s*(.+?)\s*#\s*\1
       const headerMatch = line.match(/^(=+)\s*#\s*(.+?)\s*#\s*\1$/);
-      
+
       if (headerMatch) {
         const level = headerMatch[1].length;
         if (level >= 1) {
@@ -308,7 +308,7 @@ export default function NamuViewer({
     const set = new Set(existingSlugs);
     if (slug) {
       set.add(slug);
-    } 
+    }
     return set;
   }, [existingSlugs, slug]);
 
@@ -910,7 +910,7 @@ export default function NamuViewer({
           const filename = target.split(":")[1];
           const options = optionsRaw.split("|");
           let width: string | undefined = undefined;
-          let align: 'left' | 'center' | 'right' | undefined = undefined;
+          let align: "left" | "center" | "right" | undefined = undefined;
           options.forEach((opt) => {
             const trimmed = opt.trim();
             if (trimmed.startsWith("width=")) {
@@ -936,10 +936,7 @@ export default function NamuViewer({
 
           return [
             ...parseInline(before),
-            <span
-              key={getKey("file")}
-              className={containerClass}
-            >
+            <span key={getKey("file")} className={containerClass}>
               <img
                 src={`/uploads/${filename}`}
                 alt={filename}
@@ -1501,7 +1498,7 @@ export default function NamuViewer({
       );
     }
 
-    const Tag = includeDepth > 0 ? 'span' : 'div';
+    const Tag = includeDepth > 0 ? "span" : "div";
     return (
       <Tag key={getKey("p")} className={`${includeDepth > 0 ? "inline" : "min-h-[1.5em] leading-7"} break-all`}>
         {parseInline(line)}
@@ -1645,7 +1642,7 @@ export default function NamuViewer({
     i++;
   }
 
-  const OuterTag = includeDepth > 0 ? 'span' : 'div';
+  const OuterTag = includeDepth > 0 ? "span" : "div";
   const isIncluded = includeDepth > 0;
 
   return (
