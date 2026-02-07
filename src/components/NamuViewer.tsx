@@ -987,6 +987,7 @@ export default function NamuViewer({
               key={getKey("int-link")}
               href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
               className={`${linkColor} hover:!underline`}
+              title={targetSlug}
             >
               {labelNodes}
             </Link>,
