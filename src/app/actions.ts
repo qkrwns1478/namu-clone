@@ -248,17 +248,28 @@ export async function uploadImage(formData: FormData) {
 }
 
 export async function getCategoryDocs(categoryName: string) {
-  const category = await prisma.category.findUnique({
-    where: { name: categoryName },
+  const categories = await prisma.category.findMany({
+    where: {
+      OR: [
+        { name: categoryName },
+        { name: { startsWith: `${categoryName}#` } }
+      ]
+    },
     include: {
       pages: {
-        include: { page: true } // 연결된 페이지 정보 가져오기
+        include: { page: true }
       }
     }
   })
 
-  if (!category) return []
-  return category.pages
+  if (categories.length === 0) return []
+
+  const allPages = categories.flatMap(cat => cat.pages)
+  const uniquePages = Array.from(
+    new Map(allPages.map((item) => [item.pageId, item])).values()
+  )
+
+  return uniquePages
 }
 
 // 문서 이동 (이름 변경)

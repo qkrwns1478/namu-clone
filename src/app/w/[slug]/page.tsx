@@ -174,8 +174,8 @@ export default async function WikiPage({ params }: Props) {
               <Link
                 key={cat}
                 href={`/w/${encodeURIComponent("분류:" + cleanName)}`}
-                className={`text-[#0275d8] hover:!underline border-r pr-2 last:border-0 last:pr-0 border-gray-300 transition-all duration-200 ${
-                  hasBlur ? 'text-transparent [text-shadow:0_0_6px_#0275d8]' : ''
+                className={`text-[#0275d8] hover:!underline border-r pr-2 last:border-0 last:pr-0 border-gray-300 ${
+                  hasBlur ? 'text-transparent [text-shadow:0_0_6px_#0275d8] hover:text-[#0275d8] hover:text-shadow-none' : ''
                 }`}
                 title={`분류:${cleanName}`}
               >
