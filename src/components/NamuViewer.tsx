@@ -125,7 +125,7 @@ const IncludeRenderer = ({
   if (!content) return <span className="text-red-500 text-xs">[Include Error: {slug}]</span>;
 
   return (
-    <div>
+    <span style={{ display: "contents" }}>
       <NamuViewer
         content={content}
         slug={currentSlug}
@@ -134,7 +134,7 @@ const IncludeRenderer = ({
         visitedSlugs={new Set([...visitedSlugs, slug])}
         includeDepth={depth + 1}
       />
-    </div>
+    </span>
   );
 };
 
@@ -726,6 +726,7 @@ export default function NamuViewer({
             fetchContent={fetchContent}
             existingSlugs={existingSlugs}
             currentSlug={slug}
+            depth={includeDepth}
           />,
           ...parseInline(after),
         ];
@@ -924,7 +925,7 @@ export default function NamuViewer({
             }
           });
 
-          let containerClass = "inline-block align-middle mx-0.5";
+          let containerClass = "inline-block align-middle";
           if (align === "center") {
             containerClass = "flex justify-center w-full my-2";
           } else if (align === "left") {
@@ -1349,7 +1350,7 @@ export default function NamuViewer({
 
     return (
       <div
-        className={`overflow-x-auto my-2 ${isFloat ? "inline-block" : "w-full block"}`}
+        className={`my-2 ${isFloat ? "inline-block" : "w-full block"}`}
         style={wrapperStyle}
         key={getKey("table-wrap")}
       >
@@ -1500,10 +1501,11 @@ export default function NamuViewer({
       );
     }
 
+    const Tag = includeDepth > 0 ? 'span' : 'div';
     return (
-      <div key={getKey("p")} className="min-h-[1.5em] leading-7 break-all">
+      <Tag key={getKey("p")} className={`${includeDepth > 0 ? "inline" : "min-h-[1.5em] leading-7"} break-all`}>
         {parseInline(line)}
-      </div>
+      </Tag>
     );
   }
 
@@ -1643,9 +1645,17 @@ export default function NamuViewer({
     i++;
   }
 
+  const OuterTag = includeDepth > 0 ? 'span' : 'div';
+  const isIncluded = includeDepth > 0;
+
   return (
-    <div>
-      <div className="prose max-w-none text-gray-800 text-[15px]">{renderedContent}</div>
+    <OuterTag style={isIncluded ? { display: "contents" } : {}}>
+      <OuterTag
+        className={`${isIncluded ? "" : "prose max-w-none"} text-gray-800 text-[15px]`}
+        style={isIncluded ? { display: "contents" } : {}}
+      >
+        {renderedContent}
+      </OuterTag>
 
       {footnotes.length > 0 && (
         <div className="border-t mt-5 mb-5 pt-4 border-[#777]">
@@ -1666,6 +1676,6 @@ export default function NamuViewer({
           </ol>
         </div>
       )}
-    </div>
+    </OuterTag>
   );
 }

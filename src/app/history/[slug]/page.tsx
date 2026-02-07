@@ -29,7 +29,9 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
                 <td className="p-3">{rev.createdAt.toLocaleString()}</td>
                 <td className="p-3">
                   <div className="flex flex-col">
-                    <span className="font-bold text-gray-700">{rev.ipAddress || 'Unknown'}</span>
+                    <span className="font-bold text-gray-700">
+                      {rev.author?.username || rev.ipAddress || 'Unknown'}
+                    </span>
                     <span className="text-gray-500 text-xs">{rev.comment || '(-)'}</span>
                   </div>
                 </td>

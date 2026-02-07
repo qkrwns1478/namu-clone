@@ -12,7 +12,6 @@ import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-
 const prisma = new PrismaClient()
 
 // Include 매크로용 문서 내용 조회
@@ -53,6 +52,11 @@ export async function getWikiHistory(slug: string) {
   return await prisma.wikiRevision.findMany({
     where: {
       page: { slug: decodedSlug }
+    },
+    include: {
+      author: {
+        select: { username: true }
+      }
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -110,7 +114,7 @@ export async function saveWikiPage(formData: FormData) {
         })
       }
 
-      // 5. 리비전 저장 (기존 코드)
+      // 5. 리비전 저장
       const session = await getSession()
       await tx.wikiRevision.create({
         data: {
@@ -190,11 +194,16 @@ export async function revertWikiPage(slug: string, revisionId: number) {
     })
 
     // 되돌리기 기록도 '새로운 리비전'으로 저장 (누가 되돌렸는지 알기 위해)
+    const headerList = await headers() 
+    const ip = headerList.get('x-forwarded-for') || '127.0.0.1'
+    const session = await getSession()
     await tx.wikiRevision.create({
       data: {
         content: oldRevision.content,
         comment: `(되돌리기) r${revisionId} 버전으로 복구`,
         pageId: page.id,
+        ipAddress: session ? null : ip,
+        authorId: session?.userId,
       }
     })
   })
@@ -303,12 +312,14 @@ export async function moveWikiPage(prevState: any, formData: FormData) {
       })
 
       // 3. 이동 기록 남기기 (리비전 생성)
+      const session = await getSession()
       await tx.wikiRevision.create({
         data: {
           pageId: page.id,
           content: page.content, // 내용은 그대로
           comment: `(문서 이동) ${oldSlug} → ${newSlug} ${comment ? `: ${comment}` : ''}`,
           ipAddress: ip,
+          authorId: session?.userId,
         }
       })
     })
