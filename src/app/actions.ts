@@ -436,6 +436,10 @@ export async function signUp(prevState: any, formData: FormData) {
     return { success: false, message: "아이디와 비밀번호를 모두 입력해주세요." };
   }
 
+  if (password.length < 8) {
+    return { success: false, message: "비밀번호는 8자 이상이어야 합니다." };
+  }
+
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     await prisma.user.create({
@@ -466,7 +470,12 @@ export async function login(prevState: any, formData: FormData) {
     .sign(JWT_SECRET);
 
   const cookieStore = await cookies();
-  cookieStore.set("session", token, { httpOnly: true, secure: true });
+  cookieStore.set("session", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24,
+  });
 
   redirect("/");
 }
@@ -475,7 +484,7 @@ export async function login(prevState: any, formData: FormData) {
 export async function logout() {
   const cookieStore = await cookies();
   cookieStore.delete("session");
-  redirect("/");
+  return { success: true };
 }
 
 // 사용자 문서 기역 내역 보기

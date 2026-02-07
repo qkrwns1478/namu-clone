@@ -199,9 +199,12 @@ export default function Header() {
                     </Link>
                     <button
                       onClick={async () => {
-                        await logout();
-                        setUser(null);
-                        setShowUserMenu(false);
+                        const result = await logout();
+                        if (result.success) {
+                          setUser(null);
+                          setShowUserMenu(false);
+                          router.push("/");
+                        }
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 text-red-500"
                     >
