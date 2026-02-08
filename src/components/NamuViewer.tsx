@@ -36,7 +36,6 @@ const IncludeRenderer = ({
   const [internalExistingSlugs, setInternalExistingSlugs] = useState<string[]>(existingSlugs);
   const MAX_INCLUDE_DEPTH = 5;
 
-  // 인자 및 파라미터 미리 파싱
   const args = rawArgs.split(",");
   const slug = args[0].trim();
   const params: { [key: string]: string } = {};
@@ -55,12 +54,19 @@ const IncludeRenderer = ({
     return isExist ? "text-[#0275d8]" : "text-[#FF0000]";
   };
 
+  const nextVisitedSlugs = useMemo(() => {
+    const next = new Set(visitedSlugs);
+    next.add(slug);
+    return next;
+  }, [visitedSlugs, slug]);
+
   useEffect(() => {
-    setInternalExistingSlugs(prev => Array.from(new Set([...prev, ...existingSlugs])));
+    if (JSON.stringify(internalExistingSlugs) !== JSON.stringify(existingSlugs)) {
+      setInternalExistingSlugs(existingSlugs);
+    }
   }, [existingSlugs]);
 
   useEffect(() => {
-    // 특수 틀인 경우 fetch를 건너뜀
     if (slug === "틀:상세 내용" || slug === "틀:상위 문서") {
       setLoading(false);
       return;
@@ -68,14 +74,11 @@ const IncludeRenderer = ({
 
     if (!fetchContent || depth >= MAX_INCLUDE_DEPTH || visitedSlugs.has(slug)) {
       setLoading(false);
-      if (visitedSlugs.has(slug)) {
-        console.warn("Circular include detected:", slug);
-      }
       return;
     }
 
     fetchContent(slug)
-      .then(async (raw) => {
+      .then((raw) => {
         if (raw) {
           let processed = raw;
           Object.keys(params).forEach((key) => {
@@ -83,40 +86,37 @@ const IncludeRenderer = ({
             const regex = new RegExp(`@${key}@`, "g");
             processed = processed.replace(regex, val);
           });
-
-          // 틀 본문 내의 링크 대상 추출
-          const targets = new Set<string>();
-          const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
-          let m;
-          while ((m = linkRegex.exec(processed)) !== null) {
-            let t = m[1].split('#')[0].trim();
-            if (t) targets.add(t);
-          }
-          
-          // #redirect 대상도 추출
-          if (processed.trim().startsWith("#redirect ")) {
-            const rt = processed.trim().replace("#redirect ", "").split("#")[0].trim();
-            if (rt) targets.add(rt);
-          }
-
-          // DB에서 존재 여부 확인 후 내부 상태 업데이트
-          if (targets.size > 0) {
-            try {
-              const found = await getExistingSlugs(Array.from(targets));
-              setInternalExistingSlugs(prev => Array.from(new Set([...prev, ...found])));
-            } catch (err) {
-              console.error("Existence check failed:", err);
-            }
-          }
-
           setContent(processed);
         }
       })
-      .catch((err) => {
-        console.error("Include fetch error:", err);
-      })
       .finally(() => setLoading(false));
-  }, [slug, rawArgs, fetchContent, depth, visitedSlugs]);
+  }, [slug, fetchContent]);
+
+  useEffect(() => {
+    if (!content) return;
+
+    const targets = new Set<string>();
+    const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
+    let m;
+    while ((m = linkRegex.exec(content)) !== null) {
+      let t = m[1].split('#')[0].trim();
+      if (t) targets.add(t);
+    }
+    
+    if (content.trim().startsWith("#redirect ")) {
+      const rt = content.trim().replace("#redirect ", "").split("#")[0].trim();
+      if (rt) targets.add(rt);
+    }
+
+    if (targets.size > 0) {
+      getExistingSlugs(Array.from(targets)).then((found) => {
+        setInternalExistingSlugs(prev => {
+          const newSet = new Set([...prev, ...found]);
+          return Array.from(newSet);
+        });
+      });
+    }
+  }, [content]);
 
   if (loading) return <span className="text-gray-400 text-xs">[Loading...]</span>;
 
@@ -163,7 +163,7 @@ const IncludeRenderer = ({
         slug={currentSlug}
         existingSlugs={internalExistingSlugs}
         fetchContent={fetchContent}
-        visitedSlugs={new Set([...visitedSlugs, slug])}
+        visitedSlugs={nextVisitedSlugs}
         includeDepth={depth + 1}
       />
     </span>
