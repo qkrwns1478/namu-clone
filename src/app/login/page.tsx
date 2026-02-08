@@ -1,57 +1,25 @@
-"use client";
-
-import { useActionState } from "react";
-import { login } from "@/app/actions";
 import Link from "next/link";
+import LoginForm from "@/components/auth/LoginForm";
+import { Metadata } from "next";
 
-export default function LoginPage() {
-  const [state, formAction, isPending] = useActionState(login, null);
+export const metadata: Metadata = {
+  title: "로그인 - 나무위키",
+};
+
+export default async function LoginPage({searchParams,}: {searchParams: Promise<{ redirect?: string }>;}) {
+  const { redirect: redirectTo } = await searchParams;
 
   return (
-    <div className="max-w-[400px] mx-auto mt-12 p-6 border border-gray-300 rounded bg-white shadow-sm">
-      <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">로그인</h1>
-
-      <form action={formAction} className="flex flex-col gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">아이디</label>
-          <input
-            name="username"
-            type="text"
-            required
-            autoComplete="username"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#00a69c]"
-            placeholder="아이디 입력"
-          />
+    <div className="p-6 bg-white h-[412px] border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
+      <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all mb-4">로그인</h1>
+      <div className="max-w-[400px] mx-auto">
+        <LoginForm redirectTo={redirectTo} />
+        <div className="mt-6 text-center text-sm text-gray-600">
+          계정이 없으신가요?{" "}
+          <Link href="/signup" className="text-[#00a69c] hover:!underline">
+            회원가입하기
+          </Link>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
-          <input
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#00a69c]"
-            placeholder="비밀번호 입력"
-          />
-        </div>
-
-        {state?.message && <p className="text-red-500 text-sm mt-1">{state.message}</p>}
-
-        <button
-          type="submit"
-          disabled={isPending}
-          className="w-full bg-[#00a69c] text-white py-2 rounded font-bold hover:bg-[#008c84] transition-colors disabled:bg-gray-400"
-        >
-          {isPending ? "로그인 중..." : "로그인"}
-        </button>
-      </form>
-
-      <div className="mt-6 text-center text-sm text-gray-600">
-        계정이 없으신가요?{" "}
-        <Link href="/signup" className="text-[#00a69c] hover:underline">
-          회원가입하기
-        </Link>
       </div>
     </div>
   );
