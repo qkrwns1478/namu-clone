@@ -54,6 +54,20 @@ export const IncludeRenderer = ({
   }, [existingSlugs]);
 
   useEffect(() => {
+    let target: string | null = null;
+    if (slug === "틀:상세 내용") target = params["문서명"];
+    if (slug === "틀:상위 문서") target = params["문서명1"];
+
+    if (target && !internalExistingSlugs.includes(target)) {
+      getExistingSlugs([target]).then((found) => {
+        if (found.length > 0) {
+          setInternalExistingSlugs((prev) => Array.from(new Set([...prev, ...found])));
+        }
+      });
+    }
+  }, [slug, params]);
+
+  useEffect(() => {
     if (slug === "틀:상세 내용" || slug === "틀:상위 문서") {
       setLoading(false);
       return;
@@ -75,7 +89,7 @@ export const IncludeRenderer = ({
         }
       })
       .finally(() => setLoading(false));
-  }, [slug, fetchContent]);
+  }, [slug, fetchContent, params, depth, visitedSlugs]);
 
   useEffect(() => {
     if (!content) return;
