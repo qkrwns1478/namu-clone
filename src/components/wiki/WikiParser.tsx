@@ -414,6 +414,24 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           </a>,
           ...parseInline(after, ctx),
         ];
+      } else if (target.startsWith("!NW:")) {
+        const nwTarget = target.slice(4);
+        const labelNodes = optionsRaw ? parseInline(optionsRaw, ctx) : [nwTarget];
+        
+        return [
+          ...parseInline(before, ctx),
+          <a
+            key={getKey("nw-link", ctx)}
+            href={`https://namu.wiki/w/${encodeURIComponent(nwTarget)}`}
+            target="blank"
+            rel="noreferrer"
+            className="text-[#0275d8] hover:!underline"
+            title={nwTarget}
+          >
+            {labelNodes}
+          </a>,
+          ...parseInline(after, ctx),
+        ];
       } else {
         const hashIndex = target.indexOf("#");
         let targetSlug = target.trim();
