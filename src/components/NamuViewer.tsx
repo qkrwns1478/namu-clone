@@ -5,6 +5,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { IoLink } from "react-icons/io5";
+import { getExistingSlugs } from "@/app/actions";
 
 // 목차 아이템 타입
 type TocItem = {
@@ -32,6 +33,7 @@ const IncludeRenderer = ({
 }) => {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [internalExistingSlugs, setInternalExistingSlugs] = useState<string[]>(existingSlugs);
   const MAX_INCLUDE_DEPTH = 5;
 
   // 인자 및 파라미터 미리 파싱
@@ -54,6 +56,10 @@ const IncludeRenderer = ({
   };
 
   useEffect(() => {
+    setInternalExistingSlugs(prev => Array.from(new Set([...prev, ...existingSlugs])));
+  }, [existingSlugs]);
+
+  useEffect(() => {
     // 특수 틀인 경우 fetch를 건너뜀
     if (slug === "틀:상세 내용" || slug === "틀:상위 문서") {
       setLoading(false);
@@ -69,7 +75,7 @@ const IncludeRenderer = ({
     }
 
     fetchContent(slug)
-      .then((raw) => {
+      .then(async (raw) => {
         if (raw) {
           let processed = raw;
           Object.keys(params).forEach((key) => {
@@ -77,6 +83,32 @@ const IncludeRenderer = ({
             const regex = new RegExp(`@${key}@`, "g");
             processed = processed.replace(regex, val);
           });
+
+          // 틀 본문 내의 링크 대상 추출
+          const targets = new Set<string>();
+          const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
+          let m;
+          while ((m = linkRegex.exec(processed)) !== null) {
+            let t = m[1].split('#')[0].trim();
+            if (t) targets.add(t);
+          }
+          
+          // #redirect 대상도 추출
+          if (processed.trim().startsWith("#redirect ")) {
+            const rt = processed.trim().replace("#redirect ", "").split("#")[0].trim();
+            if (rt) targets.add(rt);
+          }
+
+          // DB에서 존재 여부 확인 후 내부 상태 업데이트
+          if (targets.size > 0) {
+            try {
+              const found = await getExistingSlugs(Array.from(targets));
+              setInternalExistingSlugs(prev => Array.from(new Set([...prev, ...found])));
+            } catch (err) {
+              console.error("Existence check failed:", err);
+            }
+          }
+
           setContent(processed);
         }
       })
@@ -84,7 +116,7 @@ const IncludeRenderer = ({
         console.error("Include fetch error:", err);
       })
       .finally(() => setLoading(false));
-  }, [slug, rawArgs, fetchContent]);
+  }, [slug, rawArgs, fetchContent, depth, visitedSlugs]);
 
   if (loading) return <span className="text-gray-400 text-xs">[Loading...]</span>;
 
@@ -129,7 +161,7 @@ const IncludeRenderer = ({
       <NamuViewer
         content={content}
         slug={currentSlug}
-        existingSlugs={existingSlugs}
+        existingSlugs={internalExistingSlugs}
         fetchContent={fetchContent}
         visitedSlugs={new Set([...visitedSlugs, slug])}
         includeDepth={depth + 1}

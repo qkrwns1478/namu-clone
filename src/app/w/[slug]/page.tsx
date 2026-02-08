@@ -149,14 +149,18 @@ export default async function WikiPage({ params, searchParams }: Props) {
   // 본문 내 링크 파싱하여 존재 여부 확인
   let existingSlugs: string[] = [];
   if (page) {
-    const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
     const targets = new Set<string>();
+
+    if (page.content.trim().startsWith("#redirect ")) {
+      const redirectTarget = page.content.trim().replace("#redirect ", "").split("#")[0].trim();
+      if (redirectTarget) targets.add(redirectTarget);
+    }
+
+    const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
     let match;
 
-    // 본문을 스캔하여 링크 대상 추출
     while ((match = linkRegex.exec(page.content)) !== null) {
       let target = match[1];
-      // 앵커(#)가 있는 경우 앞부분(문서명)만 추출
       if (target.includes("#")) {
         target = target.split("#")[0];
       }
