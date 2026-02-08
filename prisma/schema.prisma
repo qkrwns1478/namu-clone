@@ -50,7 +50,8 @@ model WikiRevision {
   page      WikiPage @relation(fields: [pageId], references: [id])
   pageId    Int
   
-  // 로그인한 사용자를 위한 관계 추가
   author    User?    @relation(fields: [authorId], references: [id])
   authorId  Int?
+
+  @@unique([pageId, rev])
 }

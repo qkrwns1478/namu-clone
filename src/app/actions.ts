@@ -1,6 +1,7 @@
 "use server";
 
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -14,8 +15,6 @@ import { cookies } from "next/headers";
 const rawSecret = process.env.JWT_SECRET;
 if (!rawSecret) throw new Error("JWT_SECRET is required");
 const JWT_SECRET = new TextEncoder().encode(rawSecret);
-
-const prisma = new PrismaClient();
 
 // Include 매크로용 문서 내용 조회
 export async function fetchWikiContent(slug: string) {
@@ -93,55 +92,66 @@ export async function saveWikiPage(formData: FormData) {
     categories.add(match[1].trim());
   }
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      // 2. 페이지 생성/수정
-      const page = await tx.wikiPage.upsert({
-        where: { slug },
-        update: { content },
-        create: { slug, content },
-      });
+  // 재시도 로직 추가
+  let retryCount = 0;
+  const maxRetries = 3;
 
-      // 3. 기존 카테고리 연결 모두 삭제 (초기화)
-      await tx.categoryOnPage.deleteMany({
-        where: { pageId: page.id },
-      });
-
-      // 4. 새로운 카테고리 연결 생성
-      for (const catName of categories) {
-        // 카테고리가 없으면 생성, 있으면 가져오기
-        const category = await tx.category.upsert({
-          where: { name: catName },
-          update: {},
-          create: { name: catName },
+  while (retryCount < maxRetries) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        // 2. 페이지 생성/수정
+        const page = await tx.wikiPage.upsert({
+          where: { slug },
+          update: { content },
+          create: { slug, content },
         });
 
-        // 연결 테이블에 추가
-        await tx.categoryOnPage.create({
+        // 3. 기존 카테고리 연결 모두 삭제 (초기화)
+        await tx.categoryOnPage.deleteMany({
+          where: { pageId: page.id },
+        });
+
+        // 4. 새로운 카테고리 연결 생성
+        for (const catName of categories) {
+          // 카테고리가 없으면 생성, 있으면 가져오기
+          const category = await tx.category.upsert({
+            where: { name: catName },
+            update: {},
+            create: { name: catName },
+          });
+
+          // 연결 테이블에 추가
+          await tx.categoryOnPage.create({
+            data: {
+              pageId: page.id,
+              categoryId: category.id,
+            },
+          });
+        }
+
+        // 5. 리비전 저장
+        const session = await getSession();
+        const nextRev = await getNextRev(tx, page.id);
+        await tx.wikiRevision.create({
           data: {
+            rev: nextRev,
+            content,
+            comment: comment || "문서 수정",
+            ipAddress: session ? null : ip,
             pageId: page.id,
-            categoryId: category.id,
+            authorId: session?.userId,
           },
         });
-      }
-
-      // 5. 리비전 저장
-      const session = await getSession();
-      const nextRev = await getNextRev(tx, page.id);
-      await tx.wikiRevision.create({
-        data: {
-          rev: nextRev,
-          content,
-          comment: comment || "문서 수정",
-          ipAddress: session ? null : ip,
-          pageId: page.id,
-          authorId: session?.userId,
-        },
       });
-    });
-  } catch (error) {
-    console.error("Save failed:", error);
-    return;
+      break;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          retryCount++;
+          if (retryCount >= maxRetries) throw error;
+          continue;
+        }
+        throw error;
+    }
   }
 
   revalidatePath(`/w/${slug}`);
@@ -434,6 +444,11 @@ export async function signUp(prevState: any, formData: FormData) {
 
   if (!username || !password) {
     return { success: false, message: "아이디와 비밀번호를 모두 입력해주세요." };
+  }
+
+  const usernameRegex = /^[a-zA-Z0-9_-]{3,20}$/;
+  if (!usernameRegex.test(username)) {
+    return { success: false, message: "아이디는 3-20자의 영문, 숫자, 밑줄, 하이픈만 사용 가능합니다." };
   }
 
   if (password.length < 8) {
