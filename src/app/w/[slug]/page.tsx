@@ -1,6 +1,7 @@
 import { getWikiPage, getCategoryDocs, getExistingSlugs, fetchWikiContent } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 import SlugTitle from "@/components/SlugTitle";
+import Disclaimer from "@/components/Disclaimer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { Star, MoreVertical } from "lucide-react";
@@ -206,11 +207,15 @@ export default async function WikiPage({ params, searchParams }: Props) {
           </button>
         </div>
       </div>
+
+      {/* 대문 안내 메시지 */}
+      {decodedSlug === "나무위키:대문" && <Disclaimer />}
+
       {/* 리다이렉트 안내 메시지 */}
       {decodedFrom && (
         <div className="mb-4 flex items-center text-[15px] text-[#373a3c] bg-[#aacdec] border border-[#2378c3] rounded p-3">
-          <Link 
-            href={`/w/${encodeURIComponent(decodedFrom)}?noredirect=1`} 
+          <Link
+            href={`/w/${encodeURIComponent(decodedFrom)}?noredirect=1`}
             className="text-[#0275d8] hover:!underline"
           >
             {decodedFrom}
