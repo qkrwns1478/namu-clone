@@ -37,49 +37,50 @@ const getKey = (prefix: string, ctx: ParserContext) => {
   return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
+// 정규식 패턴 추출
+const INLINE_PATTERNS = {
+  note: /\[\*/,
+  include: /\[include\((.*?)\)\]/i,
+  youtube: /\[youtube\((.*?)\)\]/i,
+  wiki: /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/,
+  br: /\[br\]/i,
+  bold: /'''(.*?)'''/,
+  italic: /''(.*?)''/,
+  underline: /__(.*?)__/,
+  del: /~~(.*?)~~/,
+  dashDel: /--(.*?)--/,
+  sup: /\^\^(.*?)\^\^/,
+  sub: /,,(.*?),,/,
+  redirect: /^#redirect\s+(.*)$/i,
+} as const;
+
+// 블록 파싱용 정규식 패턴
+const BLOCK_PATTERNS = {
+  header: /^(=+)\s*(#?)\s*(.+?)\s*\2\s*\1$/,
+  list: /^(\s*)\*\s*(.*)$/,
+  hr: /^-{4,}$/,
+  quote: /^>/,
+} as const;
+
 // 1. 인라인 파서
 export function parseInline(text: string, ctx: ParserContext): React.ReactNode[] {
-  // 1-1. 각주 처리
-  const noteStartRegex = /\[\*/;
-  const noteStartMatch = noteStartRegex.exec(text);
-
-  const includeRegex = /\[include\((.*?)\)\]/i;
-  const includeMatch = includeRegex.exec(text);
+  const noteMatch = INLINE_PATTERNS.note.exec(text);
+  const includeMatch = INLINE_PATTERNS.include.exec(text);
+  const youtubeMatch = INLINE_PATTERNS.youtube.exec(text);
+  const wikiMatch = INLINE_PATTERNS.wiki.exec(text);
+  const brMatch = INLINE_PATTERNS.br.exec(text);
+  const boldMatch = INLINE_PATTERNS.bold.exec(text);
+  const italicMatch = INLINE_PATTERNS.italic.exec(text);
+  const underlineMatch = INLINE_PATTERNS.underline.exec(text);
+  const delMatch = INLINE_PATTERNS.del.exec(text);
+  const dashDelMatch = INLINE_PATTERNS.dashDel.exec(text);
+  const supMatch = INLINE_PATTERNS.sup.exec(text);
+  const subMatch = INLINE_PATTERNS.sub.exec(text);
 
   const braceIdx = text.indexOf("{{{");
 
-  const youtubeRegex = /\[youtube\((.*?)\)\]/i;
-  const youtubeMatch = youtubeRegex.exec(text);
-
-  const wikiRegex = /\[\[((?:[^[\]]|\[\[(?:[^[\]])*\]\])*)\]\]/;
-  const wikiMatch = wikiRegex.exec(text);
-
-  const brRegex = /\[br\]/i;
-  const brMatch = brRegex.exec(text);
-
-  const boldRegex = /'''(.*?)'''/;
-  const boldMatch = boldRegex.exec(text);
-
-  const italicRegex = /''(.*?)''/;
-  const italicMatch = italicRegex.exec(text);
-
-  const underlineRegex = /__(.*?)__/;
-  const underlineMatch = underlineRegex.exec(text);
-
-  const delRegex = /~~(.*?)~~/;
-  const delMatch = delRegex.exec(text);
-
-  const dashDelRegex = /--(.*?)--/;
-  const dashDelMatch = dashDelRegex.exec(text);
-
-  const supRegex = /\^\^(.*?)\^\^/;
-  const supMatch = supRegex.exec(text);
-
-  const subRegex = /,,(.*?),,/;
-  const subMatch = subRegex.exec(text);
-
   const candidates = [
-    { type: "note", idx: noteStartMatch ? noteStartMatch.index : Infinity, match: noteStartMatch },
+    { type: "note", idx: noteMatch ? noteMatch.index : Infinity, match: noteMatch },
     { type: "include", idx: includeMatch ? includeMatch.index : Infinity, match: includeMatch },
     { type: "brace", idx: braceIdx !== -1 ? braceIdx : Infinity, match: null },
     { type: "youtube", idx: youtubeMatch ? youtubeMatch.index : Infinity, match: youtubeMatch },
@@ -848,7 +849,7 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
   }
 
   // 헤더
-  const headerMatch = line.match(/^(=+)\s*(#?)\s*(.+?)\s*\2\s*\1$/);
+  const headerMatch = line.match(BLOCK_PATTERNS.header);
   if (headerMatch && ctx.headerMap && ctx.toggleSection) {
     const level = headerMatch[1].length;
     const text = headerMatch[3];
@@ -906,7 +907,7 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
   }
 
   // 리스트
-  const listMatch = rawLine.replace(/\r$/, "").match(/^(\s*)\*\s*(.*)$/);
+  const listMatch = rawLine.replace(/\r$/, "").match(BLOCK_PATTERNS.list);
   if (listMatch) {
     const indentLevel = listMatch[1].length;
     const content = listMatch[2];
@@ -924,9 +925,9 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
 
   if (!line) return <br key={getKey("br", scopedCtx)} />;
   if (line.startsWith("[[분류:") && line.endsWith("]]")) return null;
-  if (line.match(/^-{4,}$/)) return <hr key={getKey("hr", scopedCtx)} className="my-4 border-gray-300" />;
+  if (line.match(BLOCK_PATTERNS.hr)) return <hr key={getKey("hr", scopedCtx)} className="my-4 border-gray-300" />;
 
-  if (line.startsWith(">")) {
+  if (line.match(BLOCK_PATTERNS.quote)) {
     return (
       <blockquote
         key={getKey("quote", scopedCtx)}
