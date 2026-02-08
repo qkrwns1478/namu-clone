@@ -354,8 +354,12 @@ export async function moveWikiPage(prevState: any, formData: FormData) {
   }
 
   // 캐시 갱신 및 리다이렉트
-  revalidatePath(`/w/${encodeURIComponent(oldSlug)}`);
-  redirect(`/w/${encodeURIComponent(newSlug)}`);
+  const encodedOldSlug = encodeURIComponent(oldSlug);
+  const encodedNewSlug = encodeURIComponent(newSlug);
+  revalidatePath(`/w/${encodedOldSlug}`);
+  revalidatePath(`/w/${encodedNewSlug}`);
+  revalidatePath(`/w/${encodedNewSlug}/history`);
+  redirect(`/w/${encodedNewSlug}`);
 }
 
 // 문서 삭제

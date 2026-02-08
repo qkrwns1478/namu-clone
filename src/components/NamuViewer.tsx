@@ -5,7 +5,7 @@ import { ChevronDown, ChevronLeft } from "lucide-react";
 
 import { parseCssStyle } from "@/utils/wikiUtils";
 import { Folding } from "./wiki/Folding";
-import { ParserContext, FootnoteData, parseLine, renderSubBlock, parseTable } from "./wiki/WikiParser";
+import { ParserContext, FootnoteData, parseInline, parseLine, renderSubBlock, parseTable } from "./wiki/WikiParser";
 
 type TocItem = {
   id: string;
@@ -125,7 +125,7 @@ export default function NamuViewer({
               <a href={`#${item.id}`} className="mr-1 text-[#0275d8] hover:!underline block truncate">
                 <span>{item.numberStr}</span>
               </a>
-              <span className="text-[#373a3c]">{item.text}</span>
+              <span className="text-[#373a3c]">{parseInline(item.text, parserCtx)}</span>
             </div>
           ))}
         </div>
@@ -164,6 +164,9 @@ export default function NamuViewer({
 
   const footnotes: FootnoteData[] = [];
 
+  let keyCounter = 0;
+  const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
+
   // 파서 컨텍스트 생성
   const parserCtx: ParserContext = {
     slug,
@@ -176,10 +179,8 @@ export default function NamuViewer({
     collapsedSections,
     toggleSection,
     tocRenderer: renderToc,
+    keyGenerator: getKey,
   };
-
-  let keyCounter = 0;
-  const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
 
   const renderedContent: React.ReactNode[] = [];
   let i = 0;

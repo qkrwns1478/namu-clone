@@ -2,7 +2,7 @@ import React from "react";
 
 // CSS 스타일 문자열 파싱
 export const parseCssStyle = (styleString: string): React.CSSProperties => {
-  const style: any = {};
+  const style: Record<string, string> = {};
   const rules = styleString.split(";");
 
   rules.forEach((rule) => {
@@ -185,10 +185,8 @@ export function parseCellAttributes(rawContent: string) {
       handled = true;
     } else if (tagContent.startsWith("-")) {
       const val = parseInt(tagContent.slice(1));
-      if (!isNaN(val)) {
-        colSpan = val;
-        handled = true;
-      }
+      if (!isNaN(val)) colSpan = val;
+      handled = true;
     } else if (lowerInner.startsWith("width=")) {
       style.width = formatSize(tagContent.split("=")[1]);
       handled = true;

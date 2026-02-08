@@ -34,7 +34,8 @@ const getKey = (prefix: string, ctx: ParserContext) => {
     return ctx.keyGenerator(prefix);
   }
 
-  return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
+  console.warn('WikiParser: keyGenerator not provided, using fallback');
+  return `${prefix}-fallback-${Date.now()}`;
 };
 
 // 정규식 패턴 추출

@@ -42,15 +42,13 @@ export default function EditForm({ slug, initialContent }: { slug: string; initi
     };
 
     const handlePopState = () => {
+      if (!isDirtyRef.current) return;
       if (isChanged && !isSubmitting.current) {
         if (!window.confirm(alertMessage)) {
           window.history.pushState(null, "", window.location.href);
         } else {
           isDirtyRef.current = false;
-          window.history.back();
         }
-      } else {
-        isDirtyRef.current = false;
       }
     };
 
@@ -81,13 +79,19 @@ export default function EditForm({ slug, initialContent }: { slug: string; initi
       let match;
       while ((match = linkRegex.exec(content)) !== null) {
         let target = match[1];
+        if (target.startsWith("분류:")) continue;
         if (target.includes("#")) target = target.split("#")[0];
         if (target) targets.add(target);
       }
 
       if (targets.size > 0) {
-        const existings = await getExistingSlugs(Array.from(targets));
-        setPreviewLinks(existings);
+        try {
+          const existings = await getExistingSlugs(Array.from(targets));
+          setPreviewLinks(existings);
+        } catch (error) {
+          console.error("링크 조회 실패:", error);
+          setPreviewLinks([]);
+        }
       } else {
         setPreviewLinks([]);
       }
