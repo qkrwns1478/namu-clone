@@ -21,16 +21,21 @@ export type ParserContext = {
   existingSlugs: string[];
   visitedSlugs: Set<string>;
   includeDepth: number;
-  footnotes: FootnoteData[]; // 각주 수집용 (Mutable)
-  // 헤더/목차 관련
+  footnotes: FootnoteData[];
   headerMap?: { [line: number]: string };
   collapsedSections?: Set<string>;
   toggleSection?: (id: string) => void;
-  tocRenderer?: () => React.ReactNode; // [목차] 렌더링용 콜백
+  tocRenderer?: () => React.ReactNode;
+  keyGenerator?: (prefix: string) => string;
 };
 
-let keyCounter = 0;
-const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
+const getKey = (prefix: string, ctx: ParserContext) => {
+  if (ctx.keyGenerator) {
+    return ctx.keyGenerator(prefix);
+  }
+
+  return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
+};
 
 // 1. 인라인 파서
 export function parseInline(text: string, ctx: ParserContext): React.ReactNode[] {
@@ -72,12 +77,6 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
 
   const subRegex = /,,(.*?),,/;
   const subMatch = subRegex.exec(text);
-
-  // redirect 구문 처리 (문서 맨 앞이 아니더라도 인라인으로 처리될 수 있도록)
-  const redirectRegex = /^#redirect\s+(.*)$/i;
-  // 단, parseInline은 보통 줄 단위나 조각 단위로 불리므로 #redirect는 parseLine에서 처리하는게 일반적이지만,
-  // 인라인 텍스트 내에 섞여있지 않고 줄의 시작에만 오므로 여기서는 제외하거나, 
-  // NamuViewer의 parseLine에서 먼저 처리됨.
 
   const candidates = [
     { type: "note", idx: noteStartMatch ? noteStartMatch.index : Infinity, match: noteStartMatch },
@@ -147,7 +146,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
 
         return [
           ...parseInline(before, ctx),
-          <FootnoteRef key={getKey("fn-ref")} id={noteId} label={displayLabel} content={parsedContent} />,
+          <FootnoteRef key={getKey("fn-ref", ctx)} id={noteId} label={displayLabel} content={parsedContent} />,
           ...parseInline(after, ctx),
         ];
       }
@@ -163,7 +162,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
       return [
         ...parseInline(before, ctx),
         <IncludeRenderer
-          key={getKey("include")}
+          key={getKey("include", ctx)}
           rawArgs={rawArgs}
           fetchContent={ctx.fetchContent}
           existingSlugs={ctx.existingSlugs}
@@ -202,7 +201,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           const inner = rawContent.replace(/^#!raw\s?/, "");
           return [
             ...parseInline(before, ctx),
-            <span key={getKey("raw-inline")} className="whitespace-pre-wrap">
+            <span key={getKey("raw-inline", ctx)} className="whitespace-pre-wrap">
               {inner}
             </span>,
             ...parseInline(after, ctx),
@@ -221,7 +220,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           const contentLines = foldingContent.split("\n");
           return [
             ...parseInline(before, ctx),
-            <Folding key={getKey("folding-inline")} title={title}>
+            <Folding key={getKey("folding-inline", ctx)} title={title}>
               {renderSubBlock(contentLines, ctx)}
             </Folding>,
             ...parseInline(after, ctx),
@@ -236,7 +235,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           const contentLines = innerContent.split("\n");
           return [
             ...parseInline(before, ctx),
-            <div key={getKey("wiki-inline")} style={customStyle}>
+            <div key={getKey("wiki-inline", ctx)} style={customStyle}>
               {renderSubBlock(contentLines, ctx)}
             </div>,
             ...parseInline(after, ctx),
@@ -261,7 +260,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           }
           return [
             ...parseInline(before, ctx),
-            <span key={getKey("color")} style={{ color: colorVal }}>
+            <span key={getKey("color", ctx)} style={{ color: colorVal }}>
               {parseInline(innerContent, ctx)}
             </span>,
             ...parseInline(after, ctx),
@@ -281,7 +280,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           const targetSize = sizeMapping[`${sign}${level}`] || "1em";
           return [
             ...parseInline(before, ctx),
-            <span key={getKey("size")} style={{ fontSize: targetSize }}>
+            <span key={getKey("size", ctx)} style={{ fontSize: targetSize }}>
               {parseInline(innerContent, ctx)}
             </span>,
             ...parseInline(after, ctx),
@@ -296,7 +295,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
     if (candidate.type === "br" && candidate.match) {
       const before = text.slice(0, candidate.idx);
       const after = text.slice(candidate.idx + candidate.match[0].length);
-      return [...parseInline(before, ctx), <br key={getKey("br-inline")} />, ...parseInline(after, ctx)];
+      return [...parseInline(before, ctx), <br key={getKey("br-inline", ctx)} />, ...parseInline(after, ctx)];
     }
 
     // [youtube]
@@ -316,7 +315,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
       }
       return [
         ...parseInline(before, ctx),
-        <div key={getKey("youtube")} className="block max-w-full">
+        <div key={getKey("youtube", ctx)} className="block max-w-full">
           <iframe
             width={width.replace("px", "")}
             height={height.replace("px", "")}
@@ -377,7 +376,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
 
         return [
           ...parseInline(before, ctx),
-          <span key={getKey("file")} className={containerClass}>
+          <span key={getKey("file", ctx)} className={containerClass}>
             <img
               src={`/uploads/${filename}`}
               alt={filename}
@@ -398,7 +397,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         return [
           ...parseInline(before, ctx),
           <a
-            key={getKey("ext-link")}
+            key={getKey("ext-link", ctx)}
             href={target}
             target="_blank"
             rel="noreferrer"
@@ -426,7 +425,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         return [
           ...parseInline(before, ctx),
           <Link
-            key={getKey("int-link")}
+            key={getKey("int-link", ctx)}
             href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
             className={`${linkColor} hover:!underline`}
             title={targetSlug}
@@ -443,7 +442,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
       const match = candidate.match;
       return [
         ...parseInline(text.slice(0, match.index), ctx),
-        <b key={getKey("bold")}>{parseInline(match[1], ctx)}</b>,
+        <b key={getKey("bold", ctx)}>{parseInline(match[1], ctx)}</b>,
         ...parseInline(text.slice(match.index + match[0].length), ctx),
       ];
     }
@@ -451,7 +450,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         const match = candidate.match;
         return [
           ...parseInline(text.slice(0, match.index), ctx),
-          <i key={getKey("italic")}>{parseInline(match[1], ctx)}</i>,
+          <i key={getKey("italic", ctx)}>{parseInline(match[1], ctx)}</i>,
           ...parseInline(text.slice(match.index + match[0].length), ctx),
         ];
     }
@@ -459,7 +458,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         const match = candidate.match;
         return [
           ...parseInline(text.slice(0, match.index), ctx),
-          <u key={getKey("underline")}>{parseInline(match[1], ctx)}</u>,
+          <u key={getKey("underline", ctx)}>{parseInline(match[1], ctx)}</u>,
           ...parseInline(text.slice(match.index + match[0].length), ctx),
         ];
     }
@@ -467,7 +466,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         const match = candidate.match;
         return [
           ...parseInline(text.slice(0, match.index), ctx),
-          <del key={getKey("del")} className="text-gray-400">{parseInline(match[1], ctx)}</del>,
+          <del key={getKey("del", ctx)} className="text-gray-400">{parseInline(match[1], ctx)}</del>,
           ...parseInline(text.slice(match.index + match[0].length), ctx),
         ];
     }
@@ -475,7 +474,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         const match = candidate.match;
         return [
           ...parseInline(text.slice(0, match.index), ctx),
-          <del key={getKey("dash-del")} className="text-gray-400">{parseInline(match[1], ctx)}</del>,
+          <del key={getKey("dash-del", ctx)} className="text-gray-400">{parseInline(match[1], ctx)}</del>,
           ...parseInline(text.slice(match.index + match[0].length), ctx),
         ];
     }
@@ -483,7 +482,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         const match = candidate.match;
         return [
           ...parseInline(text.slice(0, match.index), ctx),
-          <sup key={getKey("sup")}>{parseInline(match[1], ctx)}</sup>,
+          <sup key={getKey("sup", ctx)}>{parseInline(match[1], ctx)}</sup>,
           ...parseInline(text.slice(match.index + match[0].length), ctx),
         ];
     }
@@ -491,7 +490,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
         const match = candidate.match;
         return [
           ...parseInline(text.slice(0, match.index), ctx),
-          <sub key={getKey("sub")}>{parseInline(match[1], ctx)}</sub>,
+          <sub key={getKey("sub", ctx)}>{parseInline(match[1], ctx)}</sub>,
           ...parseInline(text.slice(match.index + match[0].length), ctx),
         ];
     }
@@ -595,7 +594,7 @@ export function parseTable(lines: string[], ctx: ParserContext) {
   }
 
   return (
-    <div className={`my-2 ${isFloat ? "inline-block" : "w-full block"}`} style={wrapperStyle} key={getKey("table-wrap")}>
+    <div className={`my-2 ${isFloat ? "inline-block" : "w-full block"}`} style={wrapperStyle} key={getKey("table-wrap", ctx)}>
       <table className="text-gray-800" style={tableStyleCleaned}>
         {maxCols > 0 && (
           <colgroup>
@@ -611,12 +610,23 @@ export function parseTable(lines: string[], ctx: ParserContext) {
             if (rowStyleCell) trStyle = rowStyleCell.rowStyle;
 
             return (
-              <tr key={getKey(`tr-${rIdx}`)} style={trStyle}>
+              <tr key={getKey(`tr-${rIdx}`, ctx)} style={trStyle}>
                 {cells.map((cell, cIdx) => {
                   const currentValColStyle = colStyles[cIdx] || {};
+                  let cellLocalCounter = 0;
+                  const cellCtx: ParserContext = {
+                    ...ctx,
+                    keyGenerator: (p: string) => {
+                      if (ctx.keyGenerator) {
+                        return ctx.keyGenerator(`${p}-c${rIdx}-${cIdx}`);
+                      }
+                      return `${p}-c${rIdx}-${cIdx}-${cellLocalCounter++}`;
+                    }
+                  };
+
                   return (
                     <td
-                      key={getKey(`td-${rIdx}-${cIdx}`)}
+                      key={getKey(`td-${rIdx}-${cIdx}`, ctx)}
                       className="border px-2 py-1 align-middle break-words"
                       style={{
                         borderColor: containerStyle.borderColor || "#ccc",
@@ -627,7 +637,7 @@ export function parseTable(lines: string[], ctx: ParserContext) {
                       colSpan={cell.colSpan}
                       rowSpan={cell.rowSpan}
                     >
-                      {parseInline(cell.content, ctx)}
+                      {parseInline(cell.content, cellCtx)}
                     </td>
                   );
                 })}
@@ -664,7 +674,8 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
 
         const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
         const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
-        depth = openMatches - closeMatches;
+        depth += openMatches * 3;
+        depth -= closeMatches * 3;
 
         if (depth <= 0) {
           let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
@@ -680,7 +691,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
 
       if (foundEnd) {
         nodes.push(
-          <div key={getKey("wiki-block-sub")} style={customStyle} className="wiki-block">
+          <div key={getKey("wiki-block-sub", ctx)} style={customStyle} className="wiki-block">
             {renderSubBlock(contentLines, ctx)}
           </div>,
         );
@@ -715,7 +726,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
 
       if (foundEnd) {
         nodes.push(
-          <Folding key={getKey("folding-sub")} title={title}>
+          <Folding key={getKey("folding-sub", ctx)} title={title}>
             {renderSubBlock(contentLines, ctx)}
           </Folding>,
         );
@@ -734,7 +745,8 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
             if(k===j) textToAnalyze = currentLineContent;
             const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
             const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
-            depth += openMatches*3; depth -= closeMatches*3;
+            depth += openMatches * 3;
+            depth -= closeMatches * 3;
             if(depth <=0){
                 let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
                 if(contentToAdd.trim() || k!==j) contentLines.push(contentToAdd);
@@ -743,7 +755,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
             contentLines.push(textToAnalyze); k++;
         }
         if(foundEnd){
-            nodes.push(<div key={getKey("raw-block")} className="whitespace-pre-wrap">{contentLines.join("\n")}</div>);
+            nodes.push(<div key={getKey("raw-block", ctx)} className="whitespace-pre-wrap">{contentLines.join("\n")}</div>);
             continue;
         }
     }
@@ -761,10 +773,20 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
         m++;
         if (tableDepth <= 0 && m < subLines.length && !subLines[m].trim().startsWith("||")) break;
       }
-      nodes.push(parseTable(tLines, ctx));
+      
+      let tableCounter = 0;
+      const tableCtx: ParserContext = {
+        ...ctx,
+        keyGenerator: (p) => {
+          if (ctx.keyGenerator) return ctx.keyGenerator(`${p}-tbl-${j}`);
+          return `${p}-tbl-${j}-${tableCounter++}`;
+        }
+      };
+
+      nodes.push(parseTable(tLines, tableCtx));
       j = m;
     } else {
-      nodes.push(parseLine(subLines[j], ctx, -1));
+      nodes.push(parseLine(subLines[j], ctx, j));
       j++;
     }
   }
@@ -774,6 +796,17 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
 // 4. 라인 파서
 export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number) {
   const line = rawLine.replace(/\r$/, "").trim();
+
+  let localCounter = 0;
+  const scopedCtx: ParserContext = {
+    ...ctx,
+    keyGenerator: (prefix: string) => {
+      if (ctx.keyGenerator) {
+        return ctx.keyGenerator(`${prefix}-L${lineIndex}`);
+      }
+      return `${prefix}-L${lineIndex}-${localCounter++}`;
+    }
+  };
 
   // 리다이렉트 구문 처리
   if (line.startsWith("#redirect ")) {
@@ -791,7 +824,7 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
     const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
 
     return (
-      <div key={getKey("redirect")} className="min-h-[1.5em] leading-7 break-all">
+      <div key={getKey("redirect", scopedCtx)} className="min-h-[1.5em] leading-7 break-all">
         #redirect{" "}
         <Link
           href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
@@ -805,13 +838,13 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
 
   if (line === "[목차]") {
     return (
-      <div key={getKey("toc-macro")} className="my-2">
+      <div key={getKey("toc-macro", scopedCtx)} className="my-2">
         {ctx.tocRenderer ? ctx.tocRenderer() : null}
       </div>
     );
   }
   if (line.toLowerCase() === "[clearfix]") {
-    return <div key={getKey("clearfix")} className="clear-both" />;
+    return <div key={getKey("clearfix", scopedCtx)} className="clear-both" />;
   }
 
   // 헤더
@@ -852,7 +885,7 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
             <span>{numberStr}</span>
           </a>
         )}
-        <span>{parseInline(text, ctx)}</span>
+        <span>{parseInline(text, scopedCtx)}</span>
         <div className="ml-auto flex gap-2 select-none" onClick={(e) => e.stopPropagation()}>
           <span className="text-[#0275d8] text-xs cursor-pointer font-normal hover:!underline">
             [편집]
@@ -864,7 +897,7 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
     return React.createElement(
       `h${level}`,
       {
-        key: getKey("header"),
+        key: getKey("header", scopedCtx),
         id: id,
         className: `${sizes[level] || sizes[6]} border-gray-300 text-[#373a3c] flex items-center scroll-mt-[60px] ${isCollapsed ? "opacity-50" : ""}`,
       },
@@ -879,35 +912,35 @@ export function parseLine(rawLine: string, ctx: ParserContext, lineIndex: number
     const content = listMatch[2];
     return (
       <div
-        key={getKey("list")}
+        key={getKey("list", scopedCtx)}
         className="flex items-start leading-7 relative"
         style={{ marginLeft: `${indentLevel * 20}px` }}
       >
         <span className="mr-2 mt-[10px] w-[5px] h-[5px] bg-black rounded-full shrink-0 block"></span>
-        <span className="break-all">{parseInline(content, ctx)}</span>
+        <span className="break-all">{parseInline(content, scopedCtx)}</span>
       </div>
     );
   }
 
-  if (!line) return <br key={getKey("br")} />;
+  if (!line) return <br key={getKey("br", scopedCtx)} />;
   if (line.startsWith("[[분류:") && line.endsWith("]]")) return null;
-  if (line.match(/^-{4,}$/)) return <hr key={getKey("hr")} className="my-4 border-gray-300" />;
+  if (line.match(/^-{4,}$/)) return <hr key={getKey("hr", scopedCtx)} className="my-4 border-gray-300" />;
 
   if (line.startsWith(">")) {
     return (
       <blockquote
-        key={getKey("quote")}
+        key={getKey("quote", scopedCtx)}
         className="bg-[#eee] border-2 border-dashed border-[#ccc] border-l-4 border-l-[#71bc6d] [border-left-style:solid] table my-4 p-4"
       >
-        {parseInline(line.slice(1).trim(), ctx)}
+        {parseInline(line.slice(1).trim(), scopedCtx)}
       </blockquote>
     );
   }
 
   const Tag = ctx.includeDepth > 0 ? "span" : "div";
   return (
-    <Tag key={getKey("p")} className={`${ctx.includeDepth > 0 ? "inline" : "min-h-[1.5em] leading-7"} break-all`}>
-      {parseInline(line, ctx)}
+    <Tag key={getKey("p", scopedCtx)} className={`${ctx.includeDepth > 0 ? "inline" : "min-h-[1.5em] leading-7"} break-all`}>
+      {parseInline(line, scopedCtx)}
     </Tag>
   );
 }
