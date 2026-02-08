@@ -53,13 +53,22 @@ export const IncludeRenderer = ({
     }
   }, [existingSlugs]);
 
+  // 특수 틀 문서 존재 여부 체크
   useEffect(() => {
-    let target: string | null = null;
-    if (slug === "틀:상세 내용") target = params["문서명"];
-    if (slug === "틀:상위 문서") target = params["문서명1"];
+    const targets: string[] = [];
+    if (slug === "틀:상세 내용" && params["문서명"]) targets.push(params["문서명"]);
+    if (slug === "틀:상위 문서" && params["문서명1"]) targets.push(params["문서명1"]);
+    if (slug === "틀:다른 뜻") {
+      for (let i = 1; i <= 10; i++) {
+        const t = params[`문서명${i}`];
+        if (t) targets.push(t);
+      }
+    }
 
-    if (target && !internalExistingSlugs.includes(target)) {
-      getExistingSlugs([target]).then((found) => {
+    const newTargets = targets.filter(t => !internalExistingSlugs.includes(t));
+
+    if (newTargets.length > 0) {
+      getExistingSlugs(newTargets).then((found) => {
         if (found.length > 0) {
           setInternalExistingSlugs((prev) => Array.from(new Set([...prev, ...found])));
         }
@@ -68,7 +77,8 @@ export const IncludeRenderer = ({
   }, [slug, params]);
 
   useEffect(() => {
-    if (slug === "틀:상세 내용" || slug === "틀:상위 문서") {
+    const specialTemplates = ["틀:상세 내용", "틀:상위 문서", "틀:다른 뜻"];
+    if (specialTemplates.includes(slug)) {
       setLoading(false);
       return;
     }
@@ -116,12 +126,12 @@ export const IncludeRenderer = ({
 
   if (loading) return <span className="text-gray-400 text-xs">[Loading...]</span>;
 
-  // 특수 틀 처리
   const getLinkStyle = (target: string) => {
     const isExist = internalExistingSlugs.includes(target) || target === currentSlug;
     return isExist ? "text-[#0275d8]" : "text-[#FF0000]";
   };
 
+  // 렌더링: 상세 내용
   if (slug === "틀:상세 내용") {
     const target = params["문서명"] || "내용";
     const linkColor = getLinkStyle(target);
@@ -139,6 +149,7 @@ export const IncludeRenderer = ({
     );
   }
 
+  // 렌더링: 상위 문서
   if (slug === "틀:상위 문서") {
     const target = params["문서명1"] || "상위 문서";
     const linkColor = getLinkStyle(target);
@@ -151,6 +162,37 @@ export const IncludeRenderer = ({
             {target}
           </Link>
         </span>
+      </div>
+    );
+  }
+
+  // 렌더링: 다른 뜻
+  if (slug === "틀:다른 뜻") {
+    const items = [];
+    for (let i = 1; i <= 10; i++) {
+      const desc = params[`설명${i}`];
+      const target = params[`문서명${i}`];
+      if (desc && target) items.push({ desc, target });
+    }
+    if (items.length === 0) return null;
+
+    return (
+      <div className="flex flex-col">
+        {items.map((item, idx) => {
+          const linkColor = getLinkStyle(item.target);
+          return (
+            <div key={idx} className="flex items-center gap-2 text-[15px]">
+              <img src="/images/다른뜻.svg" alt="" aria-hidden="true" className="w-[21px] h-[21px]" />
+              <span>
+                {item.desc}에 대한 내용은{" "}
+                <Link href={`/w/${encodeURIComponent(item.target)}`} className={`${linkColor} hover:!underline`}>
+                  {item.target}
+                </Link>{" "}
+                문서를 참고하십시오.
+              </span>
+            </div>
+          );
+        })}
       </div>
     );
   }
