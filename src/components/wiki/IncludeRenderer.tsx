@@ -25,18 +25,21 @@ export const IncludeRenderer = ({
   const [internalExistingSlugs, setInternalExistingSlugs] = useState<string[]>(existingSlugs);
   const MAX_INCLUDE_DEPTH = 5;
 
-  const args = rawArgs.split(",");
-  const slug = args[0].trim();
-  const params: { [key: string]: string } = {};
-
-  for (let i = 1; i < args.length; i++) {
-    const parts = args[i].split("=");
-    if (parts.length >= 2) {
-      const key = parts[0].trim();
-      const val = parts.slice(1).join("=").trim();
-      params[key] = val;
+  const { slug, params } = useMemo(() => {
+    const args = rawArgs.split(",");
+    const nextSlug = args[0].trim();
+    const nextParams: { [key: string]: string } = {};
+    
+    for (let i = 1; i < args.length; i++) {
+      const parts = args[i].split("=");
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join("=").trim();
+        nextParams[key] = val;
+      }
     }
-  }
+    return { slug: nextSlug, params: nextParams };
+  }, [rawArgs]);
 
   const nextVisitedSlugs = useMemo(() => {
     const next = new Set(visitedSlugs);

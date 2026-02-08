@@ -95,6 +95,7 @@ export default function EditForm({ slug, initialContent }: { slug: string; initi
   };
 
   const handleSubmit = async (formData: FormData) => {
+    if (isSubmitting.current) return;
     isSubmitting.current = true;
     try {
       await saveWikiPage(formData);

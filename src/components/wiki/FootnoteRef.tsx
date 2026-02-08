@@ -35,6 +35,8 @@ export const FootnoteRef = ({ id, label, content }: { id: number; label: string;
           id={`r${id}`}
           href={`#fn${id}`}
           className="text-[#0275d8] hover:!underline font-bold mx-0.5 cursor-pointer text-xs"
+          onFocus={handleMouseEnter}
+          onBlur={() => setIsHovered(false)}
         >
           [{label}]
         </a>

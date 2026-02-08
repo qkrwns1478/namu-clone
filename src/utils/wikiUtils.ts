@@ -172,8 +172,8 @@ export function parseCellAttributes(rawContent: string) {
       const val = parseInt(tagContent.slice(1));
       if (!isNaN(val)) {
         rowSpan = val;
-        handled = true;
       }
+      handled = true;
     } else if (tagContent === "(") {
       style.textAlign = "left";
       handled = true;

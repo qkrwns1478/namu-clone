@@ -107,15 +107,17 @@ export default function NamuViewer({
   // 목차 렌더링 함수
   const renderToc = () => (
     <div className="px-5 py-3 border border-[#ccc] bg-white inline-block min-w-[120px] max-w-full">
-      <div
-        className="flex justify-between items-center cursor-pointer select-none"
-        onClick={() => setIsTocExpanded(!isTocExpanded)}
+      <button
+        type="button"
+        className="flex justify-between items-center cursor-pointer select-none w-full text-left"
+        aria-expanded={isTocExpanded}
+        onClick={() => setIsTocExpanded((prev) => !prev)}
       >
         <span className="text-lg">목차</span>
         <span className="text-gray-500 text-xs font-normal">
           {isTocExpanded ? <ChevronDown size={20} /> : <ChevronLeft size={20} />}
         </span>
-      </div>
+      </button>
       {isTocExpanded && (
         <div className="mt-3 leading-6">
           {tocItems.map((item) => (

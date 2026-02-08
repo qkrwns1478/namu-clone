@@ -2,7 +2,6 @@ import React from "react";
 import Link from "next/link";
 import { IoLink } from "react-icons/io5";
 import { ChevronDown, ChevronRight } from "lucide-react";
-
 import { IncludeRenderer } from "./IncludeRenderer";
 import { Folding } from "./Folding";
 import { FootnoteRef } from "./FootnoteRef";
@@ -169,6 +168,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           fetchContent={ctx.fetchContent}
           existingSlugs={ctx.existingSlugs}
           currentSlug={ctx.slug}
+          visitedSlugs={ctx.visitedSlugs}
           depth={ctx.includeDepth}
         />,
         ...parseInline(after, ctx),
@@ -322,7 +322,6 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
             height={height.replace("px", "")}
             src={`https://www.youtube.com/embed/${videoId}`}
             title="YouTube video player"
-            frameBorder="0"
             allowFullScreen
             style={{ maxWidth: "100%", width, height }}
             className="border-0"
@@ -366,7 +365,7 @@ export function parseInline(text: string, ctx: ParserContext): React.ReactNode[]
           if (trimmed.startsWith("align=")) {
             const val = trimmed.split("=")[1].toLowerCase();
             if (val === "center" || val === "left" || val === "right") {
-              align = val as any;
+              align = val;
             }
           }
         });
@@ -665,8 +664,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
 
         const openMatches = (textToAnalyze.match(/\{\{\{/g) || []).length;
         const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
-        depth += openMatches * 3;
-        depth -= closeMatches * 3;
+        depth = openMatches - closeMatches;
 
         if (depth <= 0) {
           let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");

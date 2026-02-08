@@ -6,9 +6,14 @@ export const Folding = ({ title, children }: { title: string; children: React.Re
 
   return (
     <div className="w-[calc(100%-4px)] mx-[2px]">
-      <div className="cursor-pointer select-none" onClick={() => setIsOpen(!isOpen)}>
+      <button
+        type="button"
+        className="cursor-pointer select-none text-left"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((prev) => !prev)}
+      >
         <span className="font-bold text-[15px] text-gray-800">{title}</span>
-      </div>
+      </button>
       <div
         className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
           isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
