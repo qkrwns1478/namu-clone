@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState, useMemo, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
+import React, { useState, useMemo } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { IoLink } from "react-icons/io5";
-import { getExistingSlugs } from "@/app/actions";
+
+import { IncludeRenderer } from "./wiki/IncludeRenderer";
+import { Folding } from "./wiki/Folding";
+import { FootnoteRef } from "./wiki/FootnoteRef";
+import { parseCssStyle, splitCells, parseCellAttributes } from "../utils/wikiUtils";
 
 // 목차 아이템 타입
 type TocItem = {
@@ -13,265 +16,6 @@ type TocItem = {
   text: string;
   level: number;
   numberStr: string;
-};
-
-// Include 매크로 처리를 위한 내부 컴포넌트
-const IncludeRenderer = ({
-  rawArgs,
-  fetchContent,
-  existingSlugs = [],
-  currentSlug,
-  visitedSlugs = new Set<string>(),
-  depth = 0,
-}: {
-  rawArgs: string;
-  fetchContent?: (slug: string) => Promise<string | null>;
-  existingSlugs?: string[];
-  currentSlug?: string;
-  visitedSlugs?: Set<string>;
-  depth?: number;
-}) => {
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [internalExistingSlugs, setInternalExistingSlugs] = useState<string[]>(existingSlugs);
-  const MAX_INCLUDE_DEPTH = 5;
-
-  const args = rawArgs.split(",");
-  const slug = args[0].trim();
-  const params: { [key: string]: string } = {};
-
-  for (let i = 1; i < args.length; i++) {
-    const parts = args[i].split("=");
-    if (parts.length >= 2) {
-      const key = parts[0].trim();
-      const val = parts.slice(1).join("=").trim();
-      params[key] = val;
-    }
-  }
-
-  const getLinkStyle = (target: string) => {
-    const isExist = existingSlugs.includes(target) || target === currentSlug;
-    return isExist ? "text-[#0275d8]" : "text-[#FF0000]";
-  };
-
-  const nextVisitedSlugs = useMemo(() => {
-    const next = new Set(visitedSlugs);
-    next.add(slug);
-    return next;
-  }, [visitedSlugs, slug]);
-
-  useEffect(() => {
-    if (JSON.stringify(internalExistingSlugs) !== JSON.stringify(existingSlugs)) {
-      setInternalExistingSlugs(existingSlugs);
-    }
-  }, [existingSlugs]);
-
-  useEffect(() => {
-    if (slug === "틀:상세 내용" || slug === "틀:상위 문서") {
-      setLoading(false);
-      return;
-    }
-
-    if (!fetchContent || depth >= MAX_INCLUDE_DEPTH || visitedSlugs.has(slug)) {
-      setLoading(false);
-      return;
-    }
-
-    fetchContent(slug)
-      .then((raw) => {
-        if (raw) {
-          let processed = raw;
-          Object.keys(params).forEach((key) => {
-            const val = params[key];
-            const regex = new RegExp(`@${key}@`, "g");
-            processed = processed.replace(regex, val);
-          });
-          setContent(processed);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [slug, fetchContent]);
-
-  useEffect(() => {
-    if (!content) return;
-
-    const targets = new Set<string>();
-    const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
-    let m;
-    while ((m = linkRegex.exec(content)) !== null) {
-      let t = m[1].split('#')[0].trim();
-      if (t) targets.add(t);
-    }
-    
-    if (content.trim().startsWith("#redirect ")) {
-      const rt = content.trim().replace("#redirect ", "").split("#")[0].trim();
-      if (rt) targets.add(rt);
-    }
-
-    if (targets.size > 0) {
-      getExistingSlugs(Array.from(targets)).then((found) => {
-        setInternalExistingSlugs(prev => {
-          const newSet = new Set([...prev, ...found]);
-          return Array.from(newSet);
-        });
-      });
-    }
-  }, [content]);
-
-  if (loading) return <span className="text-gray-400 text-xs">[Loading...]</span>;
-
-  // --- 특수 틀 대응 로직 ---
-  if (slug === "틀:상세 내용") {
-    const target = params["문서명"] || "내용";
-    const linkColor = getLinkStyle(target);
-    return (
-      <div className="flex items-center gap-2 text-[15px]">
-        <img src="/images/상세내용.svg" alt="" aria-hidden="true" className="w-[21px] h-[21px]" />
-        <span>
-          자세한 내용은{" "}
-          <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>
-            {target}
-          </Link>{" "}
-          문서를 참고하십시오.
-        </span>
-      </div>
-    );
-  }
-
-  if (slug === "틀:상위 문서") {
-    const target = params["문서명1"] || "상위 문서";
-    const linkColor = getLinkStyle(target);
-    return (
-      <div className="flex items-center gap-2 text-[15px]">
-        <img src="/images/상위문서.svg" alt="" aria-hidden="true" className="w-[21px] h-[21px]" />
-        <span>
-          상위 문서:{" "}
-          <Link href={`/w/${encodeURIComponent(target)}`} className={`${linkColor} hover:!underline`}>
-            {target}
-          </Link>
-        </span>
-      </div>
-    );
-  }
-
-  if (!content) return <span className="text-red-500 text-xs">[Include Error: {slug}]</span>;
-
-  return (
-    <span style={{ display: "contents" }}>
-      <NamuViewer
-        content={content}
-        slug={currentSlug}
-        existingSlugs={internalExistingSlugs}
-        fetchContent={fetchContent}
-        visitedSlugs={nextVisitedSlugs}
-        includeDepth={depth + 1}
-      />
-    </span>
-  );
-};
-
-// Folding 컴포넌트
-const Folding = ({ title, children }: { title: string; children: React.ReactNode }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="w-[calc(100%-4px)] mx-[2px]">
-      <div className="cursor-pointer select-none" onClick={() => setIsOpen(!isOpen)}>
-        <span className="font-bold text-[15px] text-gray-800">{title}</span>
-      </div>
-
-      <div
-        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
-          isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
-      >
-        <div className="overflow-hidden">{children}</div>
-      </div>
-    </div>
-  );
-};
-
-// 각주 툴팁 컴포넌트
-const FootnoteRef = ({ id, label, content }: { id: number; label: string; content: React.ReactNode }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
-  const ref = useRef<HTMLElement>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const handleMouseEnter = () => {
-    if (ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      setCoords({
-        top: rect.top,
-        left: rect.left + rect.width / 2,
-      });
-      setIsHovered(true);
-    }
-  };
-
-  return (
-    <>
-      <sup
-        ref={ref}
-        className="relative"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        <a
-          id={`r${id}`}
-          href={`#fn${id}`}
-          className="text-[#0275d8] hover:!underline font-bold mx-0.5 cursor-pointer text-xs"
-        >
-          [{label}]
-        </a>
-      </sup>
-
-      {mounted &&
-        isHovered &&
-        createPortal(
-          <div
-            className="fixed z-[9999] p-2 bg-white border border-[#ccc] rounded text-sm text-gray-700 font-normal leading-normal whitespace-normal break-words text-left"
-            style={{
-              top: coords.top - 8,
-              left: coords.left,
-              width: "max-content",
-              maxWidth: "300px",
-              transform: "translate(-50%, -100%)",
-              pointerEvents: "none",
-            }}
-          >
-            <span className="text-[#0275d8] mr-1">[{label}]</span>
-            {content}
-            <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-[6px] border-t-[#ccc]"></div>
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-};
-
-// CSS 스타일 문자열을 React Style 객체로 변환하는 헬퍼 함수
-const parseCssStyle = (styleString: string): React.CSSProperties => {
-  const style: any = {};
-  const rules = styleString.split(";");
-
-  rules.forEach((rule) => {
-    const parts = rule.split(":");
-    if (parts.length < 2) return;
-
-    const key = parts[0].trim().replace(/-(\w)/g, (_, c) => c.toUpperCase());
-    const value = parts.slice(1).join(":").trim();
-
-    if (key && value) {
-      style[key] = value;
-    }
-  });
-
-  return style;
 };
 
 // 각주 데이터 타입 정의
@@ -297,6 +41,8 @@ export default function NamuViewer({
   includeDepth?: number;
 }) {
   const [isTocExpanded, setIsTocExpanded] = useState(true);
+
+  // 접기 상태 초기화 로직
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
     const initialSet = new Set<string>();
     const lines = content.split("\n");
@@ -304,7 +50,6 @@ export default function NamuViewer({
 
     lines.forEach((rawLine) => {
       const line = rawLine.replace(/\r$/, "").trim();
-      // #이 포함된 헤더 정규식: (=+)\s*#\s*(.+?)\s*#\s*\1
       const headerMatch = line.match(/^(=+)\s*#\s*(.+?)\s*#\s*\1$/);
 
       if (headerMatch) {
@@ -317,7 +62,7 @@ export default function NamuViewer({
             const numberParts = [];
             for (let i = 0; i <= counterIndex; i++) numberParts.push(counters[i]);
             const id = `s-${numberParts.join(".")}`;
-            initialSet.add(id); // 초기 접힘 목록에 추가
+            initialSet.add(id);
           }
         }
       } else {
@@ -448,33 +193,6 @@ export default function NamuViewer({
   const footnotes: FootnoteData[] = [];
   let keyCounter = 0;
   const getKey = (prefix: string) => `${prefix}-${keyCounter++}`;
-
-  // [Helper] Brace Depth를 고려하여 "||" 로 셀을 분리하는 함수
-  function splitCells(text: string): string[] {
-    const res: string[] = [];
-    let buf = "";
-    let depth = 0;
-
-    for (let i = 0; i < text.length; i++) {
-      if (text.startsWith("{{{", i)) {
-        depth++;
-        buf += "{{{";
-        i += 2;
-      } else if (text.startsWith("}}}", i)) {
-        depth--;
-        buf += "}}}";
-        i += 2;
-      } else if (depth === 0 && text.startsWith("||", i)) {
-        res.push(buf);
-        buf = "";
-        i++;
-      } else {
-        buf += text[i];
-      }
-    }
-    res.push(buf);
-    return res;
-  }
 
   // [Sub Block Renderer]
   function renderSubBlock(subLines: string[]) {
@@ -1116,171 +834,6 @@ export default function NamuViewer({
     }
 
     return [text];
-  }
-
-  function parseColorValue(val: string) {
-    if (!val) return "";
-    if (val.includes(",")) return val.split(",")[0].trim();
-    return val.trim();
-  }
-
-  function parseCellAttributes(rawContent: string) {
-    let content = rawContent;
-    let style: React.CSSProperties = {};
-    let tableStyle: React.CSSProperties = {};
-    let rowStyle: React.CSSProperties = {};
-    let colStyle: React.CSSProperties = {};
-    let colSpan = 1;
-    let rowSpan = 1;
-
-    const formatSize = (val: string) => {
-      if (!val) return undefined;
-      const trimVal = val.trim();
-      return /^\d+$/.test(trimVal) ? `${trimVal}px` : trimVal;
-    };
-
-    while (true) {
-      const trimmedCheck = content.trimStart();
-      if (!trimmedCheck.startsWith("<")) break;
-      const endIdx = trimmedCheck.indexOf(">");
-      if (endIdx === -1) break;
-      const tagContent = trimmedCheck.slice(1, endIdx);
-      const lowerInner = tagContent.toLowerCase().trim();
-      let handled = false;
-
-      if (lowerInner.startsWith("tablebordercolor=")) {
-        const v = parseColorValue(tagContent.split("=")[1]);
-        tableStyle.border = `2px solid ${v}`;
-        handled = true;
-      } else if (lowerInner.startsWith("tablebgcolor=")) {
-        const v = parseColorValue(tagContent.split("=")[1]);
-        tableStyle.backgroundColor = v;
-        style.backgroundColor = v;
-        handled = true;
-      } else if (lowerInner.startsWith("tablealign=")) {
-        const v = lowerInner.split("=")[1];
-        if (v === "right") {
-          tableStyle.float = "right";
-          tableStyle.marginLeft = "10px";
-        } else if (v === "left") {
-          tableStyle.float = "left";
-          tableStyle.marginRight = "10px";
-        } else if (v === "center") {
-          tableStyle.marginLeft = "auto";
-          tableStyle.marginRight = "auto";
-          tableStyle.float = "none";
-        }
-        handled = true;
-      } else if (lowerInner.startsWith("tablewidth=")) {
-        tableStyle.width = formatSize(tagContent.split("=")[1]);
-        handled = true;
-      } else if (lowerInner.startsWith("table")) {
-        const optsStr = tagContent.substring(5).trim();
-        const opts = optsStr.split(/\s+/);
-        opts.forEach((opt) => {
-          const parts = opt.split("=");
-          if (parts.length === 2) {
-            const k = parts[0].toLowerCase();
-            const v = parseColorValue(parts[1]);
-            if (k === "bordercolor") tableStyle.borderColor = v;
-            else if (k === "bgcolor") {
-              tableStyle.backgroundColor = v;
-              style.backgroundColor = v;
-            } else if (k === "width") tableStyle.width = formatSize(v);
-            else if (k === "align") {
-              if (v === "right") {
-                tableStyle.float = "right";
-                tableStyle.marginLeft = "10px";
-              } else if (v === "left") {
-                tableStyle.float = "left";
-                tableStyle.marginRight = "10px";
-              } else if (v === "center") {
-                tableStyle.marginLeft = "auto";
-                tableStyle.marginRight = "auto";
-              }
-            }
-          }
-        });
-        handled = true;
-      } else if (lowerInner.startsWith("rowbgcolor=")) {
-        rowStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
-        handled = true;
-      } else if (lowerInner.startsWith("rowcolor=")) {
-        rowStyle.color = parseColorValue(tagContent.split("=")[1]);
-        handled = true;
-      } else if (lowerInner.startsWith("colbgcolor=")) {
-        colStyle.backgroundColor = parseColorValue(tagContent.split("=")[1]);
-        handled = true;
-      } else if (lowerInner.startsWith("colcolor=")) {
-        colStyle.color = parseColorValue(tagContent.split("=")[1]);
-        handled = true;
-      } else if (lowerInner === "nopad") {
-        style.padding = "0px";
-        handled = true;
-      } else if (lowerInner.startsWith("bgcolor=")) {
-        style.backgroundColor = parseColorValue(tagContent.split("=")[1]);
-        handled = true;
-      } else if (tagContent.startsWith("#")) {
-        style.backgroundColor = parseColorValue(tagContent);
-        handled = true;
-      } else if (lowerInner.startsWith("color=")) {
-        style.color = parseColorValue(tagContent.split("=")[1]);
-        handled = true;
-      } else if (tagContent.startsWith("^|")) {
-        style.verticalAlign = "top";
-        const val = parseInt(tagContent.slice(2));
-        if (!isNaN(val)) rowSpan = val;
-        handled = true;
-      } else if (tagContent.startsWith("v|")) {
-        style.verticalAlign = "bottom";
-        const val = parseInt(tagContent.slice(2));
-        if (!isNaN(val)) rowSpan = val;
-        handled = true;
-      } else if (tagContent.startsWith("|")) {
-        style.verticalAlign = "middle";
-        const val = parseInt(tagContent.slice(1));
-        if (!isNaN(val)) {
-          rowSpan = val;
-          handled = true;
-        }
-      } else if (tagContent === "(") {
-        style.textAlign = "left";
-        handled = true;
-      } else if (tagContent === ":") {
-        style.textAlign = "center";
-        handled = true;
-      } else if (tagContent === ")") {
-        style.textAlign = "right";
-        handled = true;
-      } else if (tagContent.startsWith("-")) {
-        const val = parseInt(tagContent.slice(1));
-        if (!isNaN(val)) {
-          colSpan = val;
-          handled = true;
-        }
-      } else if (lowerInner.startsWith("width=")) {
-        style.width = formatSize(tagContent.split("=")[1]);
-        handled = true;
-      } else if (lowerInner.startsWith("height=")) {
-        style.height = formatSize(tagContent.split("=")[1]);
-        handled = true;
-      }
-
-      if (handled) {
-        const tagString = "<" + tagContent + ">";
-        const tagIndex = content.indexOf(tagString);
-        if (tagIndex !== -1) content = content.slice(tagIndex + tagString.length);
-        else break;
-      } else break;
-    }
-
-    if (!style.textAlign) {
-      if (content.startsWith(" ") && content.endsWith(" ")) style.textAlign = "center";
-      else if (content.startsWith(" ") && !content.endsWith(" ")) style.textAlign = "right";
-      else if (!content.startsWith(" ") && content.endsWith(" ")) style.textAlign = "left";
-    }
-    content = content.trim();
-    return { style, tableStyle, rowStyle, colStyle, colSpan, rowSpan, content };
   }
 
   function parseTable(lines: string[]) {
