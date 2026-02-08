@@ -472,16 +472,19 @@ export async function signUp(prevState: any, formData: FormData) {
 export async function login(prevState: any, formData: FormData) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
+  const remember = formData.get("remember") === "on";
 
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return { success: false, message: "아이디 또는 비밀번호가 일치하지 않습니다." };
   }
 
-  // JWT 생성 및 쿠키 저장
+  const expirationTime = remember ? "30d" : "24h";
+  const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
+
   const token = await new SignJWT({ userId: user.id, username: user.username })
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("24h")
+    .setExpirationTime(expirationTime)
     .sign(JWT_SECRET);
 
   const cookieStore = await cookies();
@@ -489,7 +492,7 @@ export async function login(prevState: any, formData: FormData) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 24,
+    maxAge: maxAge,
   });
 
   redirect("/");

@@ -32,6 +32,17 @@ export default function LoginForm() {
         />
       </div>
 
+      <div className="flex items-center">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            name="remember"
+            type="checkbox"
+            className="w-4 h-4 border-gray-300 rounded text-[#00a69c] focus:ring-[#00a69c]"
+          />
+          <span className="text-sm text-gray-600">자동 로그인</span>
+        </label>
+      </div>
+
       {state?.message && <p className="text-red-500 text-sm mt-1">{state.message}</p>}
 
       <button
