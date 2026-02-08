@@ -154,9 +154,11 @@ export async function saveWikiPage(formData: FormData) {
     }
   }
 
-  revalidatePath(`/w/${slug}`);
-  revalidatePath(`/w/${slug}/history`);
-  redirect(`/w/${encodeURIComponent(slug)}`);
+  const encodedPath = encodeURIComponent(slug);
+  revalidatePath(`/w/${encodedPath}`);
+  revalidatePath(`/w/${encodedPath}/history`);
+
+  redirect(`/w/${encodedPath}`);
 }
 
 // 검색 기능
@@ -230,9 +232,11 @@ export async function revertWikiPage(slug: string, revisionId: number) {
     });
   });
 
-  revalidatePath(`/w/${slug}`);
-  revalidatePath(`/w/${slug}/history`);
-  redirect(`/w/${encodeURIComponent(slug)}`);
+  const encodedPath = encodeURIComponent(slug);
+  revalidatePath(`/w/${encodedPath}`);
+  revalidatePath(`/w/${encodedPath}/history`);
+
+  redirect(`/w/${encodedPath}`);
 }
 
 // 이미지 업로드 핸들러
@@ -350,7 +354,7 @@ export async function moveWikiPage(prevState: any, formData: FormData) {
   }
 
   // 캐시 갱신 및 리다이렉트
-  revalidatePath(`/w/${oldSlug}`);
+  revalidatePath(`/w/${encodeURIComponent(oldSlug)}`);
   redirect(`/w/${encodeURIComponent(newSlug)}`);
 }
 

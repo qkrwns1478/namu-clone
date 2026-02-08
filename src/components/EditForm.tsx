@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { saveWikiPage, getExistingSlugs, fetchWikiContent } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 
+const isRedirect = (error: any) => 
+  error?.digest?.startsWith('NEXT_REDIRECT') || error?.message === 'NEXT_REDIRECT';
+
 export default function EditForm({ slug, initialContent }: { slug: string; initialContent: string }) {
   const [content, setContent] = useState(initialContent);
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
@@ -96,6 +99,9 @@ export default function EditForm({ slug, initialContent }: { slug: string; initi
     try {
       await saveWikiPage(formData);
     } catch (error) {
+      if (isRedirect(error)) {
+        return;
+      }
       isSubmitting.current = false;
       alert("저장 중 오류가 발생했습니다.");
       console.error(error);
