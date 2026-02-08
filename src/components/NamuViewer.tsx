@@ -1399,6 +1399,34 @@ export default function NamuViewer({
   function parseLine(rawLine: string, lineIndex: number) {
     const line = rawLine.replace(/\r$/, "").trim();
 
+    // 리다이렉트 구문 처리
+    if (line.startsWith("#redirect ")) {
+      const target = line.replace("#redirect ", "").trim();
+      let targetSlug = target;
+      let anchor = "";
+
+      if (target.includes("#")) {
+        const parts = target.split("#");
+        targetSlug = parts[0];
+        anchor = "#" + parts[1];
+      }
+
+      const isExist = existingSet.has(targetSlug);
+      const linkColor = isExist ? "text-[#0275d8]" : "text-[#FF0000]";
+
+      return (
+        <div key={getKey("redirect")} className="min-h-[1.5em] leading-7 break-all">
+          #redirect{" "}
+          <Link
+            href={`/w/${encodeURIComponent(targetSlug)}${anchor}`}
+            className={`${linkColor} hover:!underline`}
+          >
+            {target}
+          </Link>
+        </div>
+      );
+    }
+
     if (line === "[목차]") {
       return (
         <div key={getKey("toc-macro")} className="my-2">
