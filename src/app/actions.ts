@@ -473,6 +473,7 @@ export async function login(prevState: any, formData: FormData) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
   const remember = formData.get("remember") === "on";
+  const redirectTo = (formData.get("redirectTo") as string) || "/";
 
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -495,7 +496,7 @@ export async function login(prevState: any, formData: FormData) {
     maxAge: maxAge,
   });
 
-  redirect("/");
+  redirect(redirectTo);
 }
 
 // 로그아웃

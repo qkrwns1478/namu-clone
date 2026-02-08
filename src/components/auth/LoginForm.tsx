@@ -3,11 +3,13 @@
 import { useActionState } from "react";
 import { login } from "@/app/actions";
 
-export default function LoginForm() {
+export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const [state, formAction, isPending] = useActionState(login, null);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      <input type="hidden" name="redirectTo" value={redirectTo || "/"} />
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">아이디</label>
         <input
