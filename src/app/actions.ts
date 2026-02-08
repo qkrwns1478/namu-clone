@@ -154,9 +154,11 @@ export async function saveWikiPage(formData: FormData) {
     }
   }
 
-  revalidatePath(`/w/${slug}`);
-  revalidatePath(`/w/${slug}/history`);
-  redirect(`/w/${encodeURIComponent(slug)}`);
+  const encodedPath = encodeURIComponent(slug);
+  revalidatePath(`/w/${encodedPath}`);
+  revalidatePath(`/w/${encodedPath}/history`);
+
+  redirect(`/w/${encodedPath}`);
 }
 
 // 검색 기능
@@ -230,9 +232,11 @@ export async function revertWikiPage(slug: string, revisionId: number) {
     });
   });
 
-  revalidatePath(`/w/${slug}`);
-  revalidatePath(`/w/${slug}/history`);
-  redirect(`/w/${encodeURIComponent(slug)}`);
+  const encodedPath = encodeURIComponent(slug);
+  revalidatePath(`/w/${encodedPath}`);
+  revalidatePath(`/w/${encodedPath}/history`);
+
+  redirect(`/w/${encodedPath}`);
 }
 
 // 이미지 업로드 핸들러
@@ -350,8 +354,12 @@ export async function moveWikiPage(prevState: any, formData: FormData) {
   }
 
   // 캐시 갱신 및 리다이렉트
-  revalidatePath(`/w/${oldSlug}`);
-  redirect(`/w/${encodeURIComponent(newSlug)}`);
+  const encodedOldSlug = encodeURIComponent(oldSlug);
+  const encodedNewSlug = encodeURIComponent(newSlug);
+  revalidatePath(`/w/${encodedOldSlug}`);
+  revalidatePath(`/w/${encodedNewSlug}`);
+  revalidatePath(`/w/${encodedNewSlug}/history`);
+  redirect(`/w/${encodedNewSlug}`);
 }
 
 // 문서 삭제
@@ -472,16 +480,21 @@ export async function signUp(prevState: any, formData: FormData) {
 export async function login(prevState: any, formData: FormData) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
+  const remember = formData.get("remember") === "on";
+  const rawRedirectTo = (formData.get("redirectTo") as string) || "/";
+  const redirectTo = rawRedirectTo.startsWith("/") && !rawRedirectTo.startsWith("//") ? rawRedirectTo : "/";
 
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return { success: false, message: "아이디 또는 비밀번호가 일치하지 않습니다." };
   }
 
-  // JWT 생성 및 쿠키 저장
+  const expirationTime = remember ? "30d" : "24h";
+  const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
+
   const token = await new SignJWT({ userId: user.id, username: user.username })
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("24h")
+    .setExpirationTime(expirationTime)
     .sign(JWT_SECRET);
 
   const cookieStore = await cookies();
@@ -489,10 +502,10 @@ export async function login(prevState: any, formData: FormData) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 24,
+    maxAge: maxAge,
   });
 
-  redirect("/");
+  redirect(redirectTo);
 }
 
 // 로그아웃

@@ -1,12 +1,14 @@
 import { getWikiPage, getCategoryDocs, getExistingSlugs, fetchWikiContent } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 import SlugTitle from "@/components/SlugTitle";
+import Disclaimer from "@/components/Disclaimer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { Star, MoreVertical } from "lucide-react";
 import { FaMessage, FaBook } from "react-icons/fa6";
 import { FaEdit } from "react-icons/fa";
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 // Prisma 타입 정의
 type WikiPageWithCategory = Prisma.WikiPageGetPayload<{
@@ -19,6 +21,7 @@ type WikiPageWithCategory = Prisma.WikiPageGetPayload<{
 
 type Props = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ from?: string; noredirect?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -69,12 +72,31 @@ function getInitial(char: string) {
   return "기타";
 }
 
-export default async function WikiPage({ params }: Props) {
+export default async function WikiPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { from, noredirect } = await searchParams;
   const decodedSlug = decodeURIComponent(slug);
+  const decodedFrom = from ? decodeURIComponent(from) : null;
 
   const rawPage = await getWikiPage(slug);
   const page = rawPage as WikiPageWithCategory | null;
+
+  // 리다이렉트 처리 로직
+  if (page && page.content.trim().startsWith("#redirect ") && noredirect !== "1") {
+    const target = page.content.trim().replace("#redirect ", "").trim();
+    let targetSlug = target;
+    let anchor = "";
+
+    if (target.includes("#")) {
+      const parts = target.split("#");
+      targetSlug = parts[0];
+      anchor = "#" + parts[1];
+    }
+
+    if (targetSlug && decodedSlug !== targetSlug) {
+      redirect(`/w/${encodeURIComponent(targetSlug)}?from=${encodeURIComponent(decodedSlug)}${anchor}`);
+    }
+  }
 
   const isCategoryPage = decodedSlug.startsWith("분류:");
   const categoryName = isCategoryPage ? decodedSlug.replace("분류:", "") : null;
@@ -128,14 +150,18 @@ export default async function WikiPage({ params }: Props) {
   // 본문 내 링크 파싱하여 존재 여부 확인
   let existingSlugs: string[] = [];
   if (page) {
-    const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
     const targets = new Set<string>();
+
+    if (page.content.trim().startsWith("#redirect ")) {
+      const redirectTarget = page.content.trim().replace("#redirect ", "").split("#")[0].trim();
+      if (redirectTarget) targets.add(redirectTarget);
+    }
+
+    const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
     let match;
 
-    // 본문을 스캔하여 링크 대상 추출
     while ((match = linkRegex.exec(page.content)) !== null) {
       let target = match[1];
-      // 앵커(#)가 있는 경우 앞부분(문서명)만 추출
       if (target.includes("#")) {
         target = target.split("#")[0];
       }
@@ -181,6 +207,22 @@ export default async function WikiPage({ params }: Props) {
           </button>
         </div>
       </div>
+
+      {/* 대문 안내 메시지 */}
+      {decodedSlug === "나무위키:대문" && <Disclaimer />}
+
+      {/* 리다이렉트 안내 메시지 */}
+      {decodedFrom && (
+        <div className="mb-4 flex items-center text-[15px] text-[#373a3c] bg-[#aacdec] border border-[#2378c3] rounded p-3">
+          <Link
+            href={`/w/${encodeURIComponent(decodedFrom)}?noredirect=1`}
+            className="text-[#0275d8] hover:!underline"
+          >
+            {decodedFrom}
+          </Link>
+          <span>에서 넘어옴</span>
+        </div>
+      )}
 
       {/* 분류 상자 */}
       {linkedCategories.length > 0 && (
