@@ -4,7 +4,8 @@ import SlugTitle from "@/components/SlugTitle";
 import Disclaimer from "@/components/Disclaimer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
-import { Star, MoreVertical, AlertTriangle } from "lucide-react";
+import { format } from 'date-fns';
+import { Star, MoreVertical } from "lucide-react";
 import { FaMessage, FaBook } from "react-icons/fa6";
 import { FaEdit } from "react-icons/fa";
 import { Metadata } from "next";
@@ -32,27 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const CHO_SUNG = [
-  "ㄱ",
-  "ㄲ",
-  "ㄴ",
-  "ㄷ",
-  "ㄸ",
-  "ㄹ",
-  "ㅁ",
-  "ㅂ",
-  "ㅃ",
-  "ㅅ",
-  "ㅆ",
-  "ㅇ",
-  "ㅈ",
-  "ㅉ",
-  "ㅊ",
-  "ㅋ",
-  "ㅌ",
-  "ㅍ",
-  "ㅎ",
-];
+const CHO_SUNG = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
 
 function getInitial(char: string) {
   const code = char.charCodeAt(0);
@@ -67,7 +48,8 @@ function getInitial(char: string) {
   }
   // 영문이나 숫자는 그대로 대문자로 반환하거나 기타 처리
   if (/[a-zA-Z]/.test(char)) return char.toUpperCase();
-  if (/[0-9]/.test(char)) return char; // 숫자는 숫자 그대로 그룹화 or '0-9'로 묶기
+  // 숫자는 숫자 그대로 그룹화 or '0-9'로 묶기
+  if (/[0-9]/.test(char)) return char;
 
   return "기타";
 }
@@ -140,7 +122,6 @@ export default async function WikiPage({ params, searchParams }: Props) {
   // 스타일 클래스
   const btnToolClass =
     "p-1 border border-[#ccc] rounded text-gray-600 hover:bg-gray-100 transition-colors bg-white flex items-center justify-center w-[32px] h-[32px]";
-
   const btnToolMiddleClass =
     "flex items-center gap-1 px-3 py-1 border border-r-0 border-[#ccc] rounded rounded-l-none rounded-r-none text-[15px] text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
   const btnToolRightClass =
@@ -196,15 +177,15 @@ export default async function WikiPage({ params, searchParams }: Props) {
     <div className="p-6 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       {/* 상단 툴바 */}
       <div className="flex justify-between">
-        <div className="mb-4">
+        <div className={`mb-4 ${revisionData ? " flex items-center gap-2" : ""}`}>
           <SlugTitle slug={page.slug} />
-          <div className="text-sm text-[#212529BF] mt-2">
-            {revisionData ? (
-                <span>수정 시각: {lastModified?.toLocaleString()} (r{revisionData.rev})</span>
-            ) : (
-                <span>최근 수정 시각: {lastModified?.toLocaleString()}</span>
-            )}
-          </div>
+          {revisionData ? (
+            <span className="text-3xl font-bold text-[#373a3c]">(r{revisionData.rev})</span>
+          ) : (
+            <div className="text-sm text-[#212529BF] mt-2">
+              <span>최근 수정 시각: {format(lastModified || new Date(), 'yyyy-MM-dd HH:mm:ss')}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 flex-wrap">
@@ -233,11 +214,10 @@ export default async function WikiPage({ params, searchParams }: Props) {
 
       {/* 리비전 보기 경고 배너 */}
       {revisionData && (
-        <div className="mb-4 flex items-center gap-2 text-sm border border-red-300 bg-red-50 text-red-800 p-3 rounded">
-          <AlertTriangle size={16} />
+        <div className="flex items-center p-4 bg-[#f2938c] border border-[#d83933] rounded text-[#3f0404] mb-4">
           <span>
-            <strong>주의:</strong> 현재 <strong>r{revisionData.rev}</strong> 버전의 문서를 보고 있습니다.{" "}
-            <Link href={`/w/${encodedSlug}`} className="underline font-bold hover:text-red-950">
+            <strong>[주의]</strong> 문서의 이전 버전({format(revisionData.createdAt, 'yyyy-MM-dd HH:mm:ss')})을 보고 있습니다.{" "}
+            <Link href={`/w/${encodedSlug}`} className="text-[#0275d8] hover:!underline">
               최신 버전으로 돌아가기
             </Link>
           </span>

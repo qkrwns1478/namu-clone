@@ -146,7 +146,7 @@ export async function saveWikiPage(formData: FormData) {
           data: {
             rev: nextRev,
             content,
-            comment: comment || "문서 수정",
+            comment: comment || "",
             ipAddress: session ? null : ip,
             pageId: page.id,
             authorId: session?.userId,
