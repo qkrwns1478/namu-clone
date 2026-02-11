@@ -1,10 +1,10 @@
-import { getWikiPage, getCategoryDocs, getExistingSlugs, fetchWikiContent } from "@/app/actions";
+import { getWikiPage, getCategoryDocs, getExistingSlugs, fetchWikiContent, getWikiRevision } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 import SlugTitle from "@/components/SlugTitle";
 import Disclaimer from "@/components/Disclaimer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
-import { Star, MoreVertical } from "lucide-react";
+import { Star, MoreVertical, AlertTriangle } from "lucide-react";
 import { FaMessage, FaBook } from "react-icons/fa6";
 import { FaEdit } from "react-icons/fa";
 import { Metadata } from "next";
@@ -21,7 +21,7 @@ type WikiPageWithCategory = Prisma.WikiPageGetPayload<{
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ from?: string; noredirect?: string }>;
+  searchParams: Promise<{ from?: string; noredirect?: string; rev?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -74,12 +74,28 @@ function getInitial(char: string) {
 
 export default async function WikiPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { from, noredirect } = await searchParams;
+  const { from, noredirect, rev } = await searchParams;
   const decodedSlug = decodeURIComponent(slug);
   const decodedFrom = from ? decodeURIComponent(from) : null;
 
   const rawPage = await getWikiPage(slug);
   const page = rawPage as WikiPageWithCategory | null;
+
+  // 특정 리비전 조회 로직
+  let content = page?.content || "";
+  let lastModified = page?.updatedAt;
+  let revisionData = null;
+
+  if (rev && page) {
+    const revNum = parseInt(rev, 10);
+    if (!isNaN(revNum)) {
+      revisionData = await getWikiRevision(slug, revNum);
+      if (revisionData) {
+        content = revisionData.content;
+        lastModified = revisionData.createdAt;
+      }
+    }
+  }
 
   // 리다이렉트 처리 로직
   if (page && page.content.trim().startsWith("#redirect ") && noredirect !== "1") {
@@ -183,7 +199,11 @@ export default async function WikiPage({ params, searchParams }: Props) {
         <div className="mb-4">
           <SlugTitle slug={page.slug} />
           <div className="text-sm text-[#212529BF] mt-2">
-            최근 수정 시각: {page.updatedAt.toLocaleString()}
+            {revisionData ? (
+                <span>수정 시각: {lastModified?.toLocaleString()} (r{revisionData.rev})</span>
+            ) : (
+                <span>최근 수정 시각: {lastModified?.toLocaleString()}</span>
+            )}
           </div>
         </div>
 
@@ -209,10 +229,23 @@ export default async function WikiPage({ params, searchParams }: Props) {
       </div>
 
       {/* 대문 안내 메시지 */}
-      {decodedSlug === "나무위키:대문" && <Disclaimer />}
+      {!revisionData && decodedSlug === "나무위키:대문" && <Disclaimer />}
+
+      {/* 리비전 보기 경고 배너 */}
+      {revisionData && (
+        <div className="mb-4 flex items-center gap-2 text-sm border border-red-300 bg-red-50 text-red-800 p-3 rounded">
+          <AlertTriangle size={16} />
+          <span>
+            <strong>주의:</strong> 현재 <strong>r{revisionData.rev}</strong> 버전의 문서를 보고 있습니다.{" "}
+            <Link href={`/w/${encodedSlug}`} className="underline font-bold hover:text-red-950">
+              최신 버전으로 돌아가기
+            </Link>
+          </span>
+        </div>
+      )}
 
       {/* 리다이렉트 안내 메시지 */}
-      {decodedFrom && (
+      {decodedFrom && !revisionData && (
         <div className="mb-4 flex items-center text-[15px] text-[#373a3c] bg-[#aacdec] border border-[#2378c3] rounded p-3">
           <Link
             href={`/w/${encodeURIComponent(decodedFrom)}?noredirect=1`}
@@ -253,7 +286,7 @@ export default async function WikiPage({ params, searchParams }: Props) {
       {/* 본문 뷰어 */}
       <div className="min-h-[300px]">
         <NamuViewer
-          content={page.content}
+          content={content}
           slug={decodedSlug}
           existingSlugs={existingSlugs}
           fetchContent={fetchWikiContent}

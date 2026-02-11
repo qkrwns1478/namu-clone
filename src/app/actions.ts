@@ -550,3 +550,14 @@ export async function getUserContributions(username: string, page: number = 1) {
     totalPages: Math.ceil(total / pageSize),
   };
 }
+
+// 특정 리비전 조회
+export async function getWikiRevision(slug: string, rev: number) {
+  const decodedSlug = decodeURIComponent(slug);
+  return await prisma.wikiRevision.findFirst({
+    where: {
+      page: { slug: decodedSlug },
+      rev: rev,
+    },
+  });
+}

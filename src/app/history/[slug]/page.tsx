@@ -1,6 +1,7 @@
 import { getWikiHistory, revertWikiPage } from "@/app/actions";
 import SlugTitle from "@/components/SlugTitle";
 import { Metadata } from "next";
+import Link from "next/link";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -50,13 +51,19 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
                   </div>
                 </td>
                 <td className="p-3">
+                  <Link 
+                    href={`/w/${slug}?rev=${rev.rev}`} 
+                    className="text-[#0275d8] hover:!underline text-xs"
+                  >
+                    보기
+                  </Link>
                   <form
                     action={async () => {
                       "use server";
                       await revertWikiPage(decodedSlug, rev.id);
                     }}
                   >
-                    <button className="text-blue-500 hover:underline text-xs" type="submit">
+                    <button className="text-[#0275d8] hover:!underline text-xs" type="submit">
                       이 버전으로 되돌리기
                     </button>
                   </form>
