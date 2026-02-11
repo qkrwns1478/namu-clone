@@ -75,6 +75,9 @@ export default async function WikiPage({ params, searchParams }: Props) {
       if (revisionData) {
         content = revisionData.content;
         lastModified = revisionData.createdAt;
+      } else {
+        // 요청한 리비전이 없을 경우 최신 버전으로 리다이렉트
+        redirect(`/w/${encodeURIComponent(slug)}`);
       }
     }
   }
