@@ -1,9 +1,10 @@
-import { getWikiPage, getCategoryDocs, getExistingSlugs, fetchWikiContent } from "@/app/actions";
+import { getWikiPage, getCategoryDocs, getExistingSlugs, fetchWikiContent, getWikiRevision } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 import SlugTitle from "@/components/SlugTitle";
 import Disclaimer from "@/components/Disclaimer";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
+import { format } from 'date-fns';
 import { Star, MoreVertical } from "lucide-react";
 import { FaMessage, FaBook } from "react-icons/fa6";
 import { FaEdit } from "react-icons/fa";
@@ -21,7 +22,7 @@ type WikiPageWithCategory = Prisma.WikiPageGetPayload<{
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ from?: string; noredirect?: string }>;
+  searchParams: Promise<{ from?: string; noredirect?: string; rev?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -32,27 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const CHO_SUNG = [
-  "ㄱ",
-  "ㄲ",
-  "ㄴ",
-  "ㄷ",
-  "ㄸ",
-  "ㄹ",
-  "ㅁ",
-  "ㅂ",
-  "ㅃ",
-  "ㅅ",
-  "ㅆ",
-  "ㅇ",
-  "ㅈ",
-  "ㅉ",
-  "ㅊ",
-  "ㅋ",
-  "ㅌ",
-  "ㅍ",
-  "ㅎ",
-];
+const CHO_SUNG = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
 
 function getInitial(char: string) {
   const code = char.charCodeAt(0);
@@ -67,19 +48,39 @@ function getInitial(char: string) {
   }
   // 영문이나 숫자는 그대로 대문자로 반환하거나 기타 처리
   if (/[a-zA-Z]/.test(char)) return char.toUpperCase();
-  if (/[0-9]/.test(char)) return char; // 숫자는 숫자 그대로 그룹화 or '0-9'로 묶기
+  // 숫자는 숫자 그대로 그룹화 or '0-9'로 묶기
+  if (/[0-9]/.test(char)) return char;
 
   return "기타";
 }
 
 export default async function WikiPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { from, noredirect } = await searchParams;
+  const { from, noredirect, rev } = await searchParams;
   const decodedSlug = decodeURIComponent(slug);
   const decodedFrom = from ? decodeURIComponent(from) : null;
 
   const rawPage = await getWikiPage(slug);
   const page = rawPage as WikiPageWithCategory | null;
+
+  // 특정 리비전 조회 로직
+  let content = page?.content || "";
+  let lastModified = page?.updatedAt;
+  let revisionData = null;
+
+  if (rev && page) {
+    const revNum = parseInt(rev, 10);
+    if (!isNaN(revNum)) {
+      revisionData = await getWikiRevision(slug, revNum);
+      if (revisionData) {
+        content = revisionData.content;
+        lastModified = revisionData.createdAt;
+      } else {
+        // 요청한 리비전이 없을 경우 최신 버전으로 리다이렉트
+        redirect(`/w/${encodeURIComponent(slug)}`);
+      }
+    }
+  }
 
   // 리다이렉트 처리 로직
   if (page && page.content.trim().startsWith("#redirect ") && noredirect !== "1") {
@@ -124,7 +125,6 @@ export default async function WikiPage({ params, searchParams }: Props) {
   // 스타일 클래스
   const btnToolClass =
     "p-1 border border-[#ccc] rounded text-gray-600 hover:bg-gray-100 transition-colors bg-white flex items-center justify-center w-[32px] h-[32px]";
-
   const btnToolMiddleClass =
     "flex items-center gap-1 px-3 py-1 border border-r-0 border-[#ccc] rounded rounded-l-none rounded-r-none text-[15px] text-[#212529BF] hover:bg-gray-100 transition-colors bg-white h-[32px]";
   const btnToolRightClass =
@@ -180,11 +180,15 @@ export default async function WikiPage({ params, searchParams }: Props) {
     <div className="p-6 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       {/* 상단 툴바 */}
       <div className="flex justify-between">
-        <div className="mb-4">
+        <div className={`mb-4 ${revisionData ? " flex items-center gap-2" : ""}`}>
           <SlugTitle slug={page.slug} />
-          <div className="text-sm text-[#212529BF] mt-2">
-            최근 수정 시각: {page.updatedAt.toLocaleString()}
-          </div>
+          {revisionData ? (
+            <span className="text-3xl font-bold text-[#373a3c]">(r{revisionData.rev})</span>
+          ) : (
+            <div className="text-sm text-[#212529BF] mt-2">
+              <span>최근 수정 시각: {format(lastModified || new Date(), 'yyyy-MM-dd HH:mm:ss')}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 flex-wrap">
@@ -209,10 +213,22 @@ export default async function WikiPage({ params, searchParams }: Props) {
       </div>
 
       {/* 대문 안내 메시지 */}
-      {decodedSlug === "나무위키:대문" && <Disclaimer />}
+      {!revisionData && decodedSlug === "나무위키:대문" && <Disclaimer />}
+
+      {/* 리비전 보기 경고 배너 */}
+      {revisionData && (
+        <div className="flex items-center p-4 bg-[#f2938c] border border-[#d83933] rounded text-[#3f0404] mb-4">
+          <span>
+            <strong>[주의]</strong> 문서의 이전 버전({format(revisionData.createdAt, 'yyyy-MM-dd HH:mm:ss')})을 보고 있습니다.{" "}
+            <Link href={`/w/${encodedSlug}`} className="text-[#0275d8] hover:!underline">
+              최신 버전으로 돌아가기
+            </Link>
+          </span>
+        </div>
+      )}
 
       {/* 리다이렉트 안내 메시지 */}
-      {decodedFrom && (
+      {decodedFrom && !revisionData && (
         <div className="mb-4 flex items-center text-[15px] text-[#373a3c] bg-[#aacdec] border border-[#2378c3] rounded p-3">
           <Link
             href={`/w/${encodeURIComponent(decodedFrom)}?noredirect=1`}
@@ -253,7 +269,7 @@ export default async function WikiPage({ params, searchParams }: Props) {
       {/* 본문 뷰어 */}
       <div className="min-h-[300px]">
         <NamuViewer
-          content={page.content}
+          content={content}
           slug={decodedSlug}
           existingSlugs={existingSlugs}
           fetchContent={fetchWikiContent}
