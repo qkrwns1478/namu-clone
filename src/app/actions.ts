@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { writeFile, access } from "fs/promises";
@@ -19,24 +19,38 @@ const JWT_SECRET = new TextEncoder().encode(rawSecret);
 // Include 매크로용 문서 내용 조회
 export async function fetchWikiContent(slug: string) {
   const decodedSlug = decodeURIComponent(slug);
-  const page = await prisma.wikiPage.findUnique({
-    where: { slug: decodedSlug },
-    select: { content: true },
-  });
-  return page?.content || null;
+  
+  return await unstable_cache(
+    async () => {
+      const page = await prisma.wikiPage.findUnique({
+        where: { slug: decodedSlug },
+        select: { content: true },
+      });
+      return page?.content || null;
+    },
+    [`wiki-content-${decodedSlug}`], // Cache Key
+    { tags: [`wiki-content-${decodedSlug}`], revalidate: 3600 } // 1시간 캐시, 수정 시 즉시 무효화
+  )();
 }
 
 // 문서 조회
 export async function getWikiPage(slug: string) {
   const decodedSlug = decodeURIComponent(slug);
-  return await prisma.wikiPage.findUnique({
-    where: { slug: decodedSlug },
-    include: {
-      categories: {
-        include: { category: true },
-      },
+
+  return await unstable_cache(
+    async () => {
+      return await prisma.wikiPage.findUnique({
+        where: { slug: decodedSlug },
+        include: {
+          categories: {
+            include: { category: true },
+          },
+        },
+      });
     },
-  });
+    [`wiki-page-${decodedSlug}`], // Cache Key
+    { tags: [`wiki-page-${decodedSlug}`], revalidate: 3600 }
+  )();
 }
 
 // 최근 변경 문서 목록
@@ -84,7 +98,6 @@ export async function saveWikiPage(formData: FormData) {
   const ip = headerList.get("x-forwarded-for") || "127.0.0.1";
 
   // 1. 분류 추출 로직
-  // [[분류:카테고리명]] 패턴 찾기
   const categoryRegex = /\[\[분류:(.*?)\]\]/g;
   const categories = new Set<string>();
   let match;
@@ -92,7 +105,6 @@ export async function saveWikiPage(formData: FormData) {
     categories.add(match[1].trim());
   }
 
-  // 재시도 로직 추가
   let retryCount = 0;
   const maxRetries = 3;
 
@@ -106,21 +118,19 @@ export async function saveWikiPage(formData: FormData) {
           create: { slug, content },
         });
 
-        // 3. 기존 카테고리 연결 모두 삭제 (초기화)
+        // 3. 기존 카테고리 연결 모두 삭제
         await tx.categoryOnPage.deleteMany({
           where: { pageId: page.id },
         });
 
         // 4. 새로운 카테고리 연결 생성
         for (const catName of categories) {
-          // 카테고리가 없으면 생성, 있으면 가져오기
           const category = await tx.category.upsert({
             where: { name: catName },
             update: {},
             create: { name: catName },
           });
 
-          // 연결 테이블에 추가
           await tx.categoryOnPage.create({
             data: {
               pageId: page.id,
@@ -154,6 +164,10 @@ export async function saveWikiPage(formData: FormData) {
     }
   }
 
+  const decodedSlug = decodeURIComponent(slug);
+  revalidateTag(`wiki-page-${decodedSlug}`, 'max');
+  revalidateTag(`wiki-content-${decodedSlug}`, 'max');
+  
   const encodedPath = encodeURIComponent(slug);
   revalidatePath(`/w/${encodedPath}`);
   revalidatePath(`/w/${encodedPath}/history`);
@@ -167,13 +181,11 @@ export async function searchDocs(query: string) {
 
   const decodedQuery = query.trim();
 
-  // 1. 제목이 정확히 일치하는 문서
   const exactMatch = await prisma.wikiPage.findUnique({
     where: { slug: decodedQuery },
     select: { slug: true, updatedAt: true, content: true },
   });
 
-  // 2. 제목에 검색어가 포함된 문서 (정확히 일치하는 것 제외)
   const titleMatches = await prisma.wikiPage.findMany({
     where: {
       slug: {
@@ -186,7 +198,6 @@ export async function searchDocs(query: string) {
     take: 15,
   });
 
-  // 3. 내용에 검색어가 포함된 문서 (제목 포함 검색 결과와 중복 방지)
   const contentMatches = await prisma.wikiPage.findMany({
     where: {
       content: { contains: decodedQuery },
@@ -201,6 +212,7 @@ export async function searchDocs(query: string) {
 
   return { exactMatch, titleMatches, contentMatches };
 }
+
 // 특정 리비전으로 되돌리기
 export async function revertWikiPage(slug: string, revisionId: number) {
   const oldRevision = await prisma.wikiRevision.findUnique({
@@ -232,6 +244,10 @@ export async function revertWikiPage(slug: string, revisionId: number) {
     });
   });
 
+  const decodedSlug = decodeURIComponent(slug);
+  revalidateTag(`wiki-page-${decodedSlug}`, 'max');
+  revalidateTag(`wiki-content-${decodedSlug}`, 'max');
+
   const encodedPath = encodeURIComponent(slug);
   revalidatePath(`/w/${encodedPath}`);
   revalidatePath(`/w/${encodedPath}/history`);
@@ -250,7 +266,6 @@ export async function uploadImage(formData: FormData) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 1. 기본 파일명 정리 (공백 -> 언더바)
     const originalName = file.name;
     let filename = basename(originalName)
       .replace(/\s/g, "_")
@@ -258,15 +273,12 @@ export async function uploadImage(formData: FormData) {
     const uploadDir = join(process.cwd(), "public/uploads");
     let savePath = join(uploadDir, filename);
 
-    // 2. 파일명 중복 체크 및 이름 변경 로직
     const { name: stem, ext } = parse(filename);
     let counter = 1;
 
     while (true) {
       try {
         await access(savePath, constants.F_OK);
-
-        // 파일이 존재하므로 이름 변경 (예: image_1.png)
         filename = `${stem}_${counter}${ext}`;
         savePath = join(uploadDir, filename);
         counter++;
@@ -275,7 +287,6 @@ export async function uploadImage(formData: FormData) {
       }
     }
 
-    // 3. 파일 저장
     await writeFile(savePath, buffer);
 
     return { success: true, filename };
@@ -285,6 +296,7 @@ export async function uploadImage(formData: FormData) {
   }
 }
 
+// 카테고리 문서 목록 조회
 export async function getCategoryDocs(categoryName: string) {
   const categories = await prisma.category.findMany({
     where: {
@@ -315,7 +327,6 @@ export async function moveWikiPage(prevState: any, formData: FormData) {
     return { success: false, message: "문서 제목을 입력해주세요." };
   }
 
-  // 1. 이동하려는 제목의 문서가 이미 존재하는지 확인
   const existingPage = await prisma.wikiPage.findUnique({
     where: { slug: newSlug },
   });
@@ -353,7 +364,14 @@ export async function moveWikiPage(prevState: any, formData: FormData) {
     return { success: false, message: "문서 이동 중 오류가 발생했습니다." };
   }
 
-  // 캐시 갱신 및 리다이렉트
+  const decodedOldSlug = decodeURIComponent(oldSlug);
+  const decodedNewSlug = decodeURIComponent(newSlug);
+  
+  revalidateTag(`wiki-page-${decodedOldSlug}`, 'max');
+  revalidateTag(`wiki-content-${decodedOldSlug}`, 'max');
+  revalidateTag(`wiki-page-${decodedNewSlug}`, 'max');
+  revalidateTag(`wiki-content-${decodedNewSlug}`, 'max');
+
   const encodedOldSlug = encodeURIComponent(oldSlug);
   const encodedNewSlug = encodeURIComponent(newSlug);
   revalidatePath(`/w/${encodedOldSlug}`);
@@ -369,7 +387,6 @@ export async function deleteWikiPage(formData: FormData) {
   if (!slug) return;
 
   try {
-    // 1. 삭제할 문서의 ID를 먼저 조회
     const page = await prisma.wikiPage.findUnique({
       where: { slug },
     });
@@ -379,27 +396,19 @@ export async function deleteWikiPage(formData: FormData) {
       return;
     }
 
-    // 2. 트랜잭션으로 하위 데이터부터 순차적으로 삭제
     await prisma.$transaction(async (tx) => {
-      // (1) 해당 문서의 모든 리비전(수정 기록) 삭제
-      await tx.wikiRevision.deleteMany({
-        where: { pageId: page.id },
-      });
-
-      // (2) 해당 문서의 분류 연결 정보 삭제
-      await tx.categoryOnPage.deleteMany({
-        where: { pageId: page.id },
-      });
-
-      // (3) 마지막으로 문서 자체 삭제
-      await tx.wikiPage.delete({
-        where: { id: page.id },
-      });
+      await tx.wikiRevision.deleteMany({ where: { pageId: page.id } });
+      await tx.categoryOnPage.deleteMany({ where: { pageId: page.id } });
+      await tx.wikiPage.delete({ where: { id: page.id } });
     });
   } catch (error) {
     console.error("Delete failed:", error);
     return;
   }
+
+  const decodedSlug = decodeURIComponent(slug);
+  revalidateTag(`wiki-page-${decodedSlug}`, 'max');
+  revalidateTag(`wiki-content-${decodedSlug}`, 'max');
 
   redirect("/");
 }
