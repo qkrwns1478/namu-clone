@@ -107,7 +107,7 @@ export const IncludeRenderer = ({
     const linkRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
     let m;
     while ((m = linkRegex.exec(content)) !== null) {
-      let t = m[1].split("#")[0].trim();
+      const t = m[1].split("#")[0].trim();
       if (t) targets.add(t);
     }
     if (content.trim().startsWith("#redirect ")) {

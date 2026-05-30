@@ -691,7 +691,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
       const styleMatch = l.match(/style="([^"]*)"/);
       const styleString = styleMatch ? styleMatch[1] : "";
       const customStyle = parseCssStyle(styleString);
-      let currentLineContent = l.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
+      const currentLineContent = l.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
 
       const contentLines: string[] = [];
       let depth = 3;
@@ -708,7 +708,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
         depth -= closeMatches * 3;
 
         if (depth <= 0) {
-          let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+          const contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
           if (contentToAdd.trim() || k !== j) if (contentToAdd.trim()) contentLines.push(contentToAdd);
           j = k + 1;
           foundEnd = true;
@@ -765,7 +765,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
     }
 
     if (l.startsWith("{{{#!raw")) {
-        let currentLineContent = l.replace(/^\{\{\{#!raw\s*/, "");
+        const currentLineContent = l.replace(/^\{\{\{#!raw\s*/, "");
         const contentLines: string[] = [];
         let depth = 3;
         let k = j;
@@ -778,7 +778,7 @@ export function renderSubBlock(subLines: string[], ctx: ParserContext) {
             depth += openMatches * 3;
             depth -= closeMatches * 3;
             if(depth <=0){
-                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+                const contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
                 if(contentToAdd.trim() || k!==j) contentLines.push(contentToAdd);
                 j = k+1; foundEnd=true; break;
             }

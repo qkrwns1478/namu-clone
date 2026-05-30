@@ -29,7 +29,7 @@ export default async function ContributionsPage({ params, searchParams }: Props)
     <div className="p-6 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">
       <div className="mb-4">
         <h1 className="text-4xl font-bold text-[#373a3c] leading-tight break-all">
-          "{decodedUsername}" 기여 목록
+          &quot;{decodedUsername}&quot; 기여 목록
         </h1>
         <p className="text-sm text-gray-500 mt-2">전체 {total}개의 기여 내역</p>
       </div>

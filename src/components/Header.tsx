@@ -33,6 +33,7 @@ export default function Header() {
     };
 
     fetchSession();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowUserMenu(false);
   }, [pathname]);
 

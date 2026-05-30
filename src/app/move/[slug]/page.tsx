@@ -3,7 +3,6 @@
 import { useActionState } from "react";
 import { moveWikiPage } from "@/app/actions";
 import SlugTitle from "@/components/SlugTitle";
-import { useRouter } from "next/navigation";
 import React from "react";
 
 const initialState = {
@@ -16,7 +15,6 @@ export default function MovePage({ params }: { params: Promise<{ slug: string }>
   const decodedSlug = decodeURIComponent(resolvedParams.slug);
 
   const [state, formAction, isPending] = useActionState(moveWikiPage, initialState);
-  const router = useRouter();
 
   return (
     <div className="p-6 bg-white border border-[#ccc] rounded-t-none rounded-b-md sm:rounded-md overflow-hidden">

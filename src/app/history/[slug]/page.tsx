@@ -1,4 +1,4 @@
-import { getWikiHistory, revertWikiPage } from "@/app/actions";
+import { getWikiHistory } from "@/app/actions";
 import SlugTitle from "@/components/SlugTitle";
 import { Metadata } from "next";
 import { format } from 'date-fns';
@@ -22,7 +22,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
   const decodedSlug = decodeURIComponent(slug);
   const history = await getWikiHistory(slug);
 
-  const viewButton = (rev: Number) => {
+  const viewButton = (rev: number) => {
     return (
       <Link href={`/w/${slug}?rev=${rev}`} className="text-[#0275d8] hover:!underline text-xs">
         보기

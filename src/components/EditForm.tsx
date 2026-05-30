@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { saveWikiPage, getExistingSlugs, fetchWikiContent } from "@/app/actions";
 import NamuViewer from "@/components/NamuViewer";
 
-const isRedirect = (error: any) => 
+const isRedirect = (error: { digest?: string; message?: string }) =>
   error?.digest?.startsWith('NEXT_REDIRECT') || error?.message === 'NEXT_REDIRECT';
 
 export default function EditForm({ slug, initialContent }: { slug: string; initialContent: string }) {
