@@ -62,6 +62,14 @@ export async function getRecentChanges() {
   });
 }
 
+export async function getMoreRecentChanges() {
+  return await prisma.wikiPage.findMany({
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+    select: { slug: true, updatedAt: true },
+  });
+}
+
 // 문서 히스토리
 export async function getWikiHistory(slug: string) {
   const decodedSlug = decodeURIComponent(slug);

@@ -25,7 +25,7 @@ export default async function RightSidebar() {
             <TbClockEdit size={18} color="#21252980" />
             <span>최근 변경</span>
           </div>
-          <Link href="/recent-changes" className="text-gray-800">
+          <Link href="/RecentChanges" className="text-gray-800">
             <ChevronRight size={18} />
           </Link>
         </div>
