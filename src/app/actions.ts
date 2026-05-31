@@ -62,6 +62,14 @@ export async function getRecentChanges() {
   });
 }
 
+export async function getMoreRecentChanges() {
+  return await prisma.wikiPage.findMany({
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+    select: { slug: true, updatedAt: true },
+  });
+}
+
 // 문서 히스토리
 export async function getWikiHistory(slug: string) {
   const decodedSlug = decodeURIComponent(slug);
@@ -77,7 +85,7 @@ export async function getWikiHistory(slug: string) {
 }
 
 // 리비전 번호 계산 헬퍼 함수
-async function getNextRev(tx: any, pageId: number) {
+async function getNextRev(tx: Prisma.TransactionClient, pageId: number) {
   const lastRev = await tx.wikiRevision.findFirst({
     where: { pageId },
     orderBy: { rev: "desc" },
@@ -282,7 +290,7 @@ export async function uploadImage(formData: FormData) {
         filename = `${stem}_${counter}${ext}`;
         savePath = join(uploadDir, filename);
         counter++;
-      } catch (error) {
+      } catch {
         break;
       }
     }
@@ -318,7 +326,7 @@ export async function getCategoryDocs(categoryName: string) {
 }
 
 // 문서 이동 (이름 변경)
-export async function moveWikiPage(prevState: any, formData: FormData) {
+export async function moveWikiPage(prevState: { success: boolean; message: string }, formData: FormData) {
   const oldSlug = formData.get("oldSlug") as string;
   const newSlug = formData.get("newSlug") as string;
   const comment = formData.get("comment") as string;
@@ -449,13 +457,13 @@ export async function getSession() {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
     return payload as { userId: number; username: string };
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
 // 회원가입
-export async function signUp(prevState: any, formData: FormData) {
+export async function signUp(prevState: { success: boolean; message: string }, formData: FormData) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
 
@@ -486,7 +494,7 @@ export async function signUp(prevState: any, formData: FormData) {
 }
 
 // 로그인
-export async function login(prevState: any, formData: FormData) {
+export async function login(prevState: { success: boolean; message: string }, formData: FormData) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
   const remember = formData.get("remember") === "on";

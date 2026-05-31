@@ -57,10 +57,10 @@ export function parseColorValue(val: string) {
 // 셀 속성 파싱 (<bgcolor=...> 등)
 export function parseCellAttributes(rawContent: string) {
   let content = rawContent;
-  let style: React.CSSProperties = {};
-  let tableStyle: React.CSSProperties = {};
-  let rowStyle: React.CSSProperties = {};
-  let colStyle: React.CSSProperties = {};
+  const style: React.CSSProperties = {};
+  const tableStyle: React.CSSProperties = {};
+  const rowStyle: React.CSSProperties = {};
+  const colStyle: React.CSSProperties = {};
   let colSpan = 1;
   let rowSpan = 1;
 

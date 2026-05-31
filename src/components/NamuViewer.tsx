@@ -194,7 +194,7 @@ export default function NamuViewer({
 
     // 블록 레벨 파싱
     if (line.startsWith("{{{#!raw")) {
-        let currentLineContent = line.replace(/^\{\{\{#!raw\s*/, "");
+        const currentLineContent = line.replace(/^\{\{\{#!raw\s*/, "");
         const contentLines: string[] = [];
         let depth = 3;
         let k = i;
@@ -206,7 +206,7 @@ export default function NamuViewer({
             const closeMatches = (textToAnalyze.match(/\}\}\}/g) || []).length;
             depth += openMatches*3; depth -= closeMatches*3;
             if(depth <=0){
-                let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+                const contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
                 if(contentToAdd.trim() || k!==i) contentLines.push(contentToAdd);
                 i = k+1; foundEnd=true; break;
             }
@@ -222,7 +222,7 @@ export default function NamuViewer({
       const styleMatch = line.match(/style="([^"]*)"/);
       const styleString = styleMatch ? styleMatch[1] : "";
       const customStyle = parseCssStyle(styleString);
-      let currentLineContent = line.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
+      const currentLineContent = line.replace(/^\{\{\{#!wiki(\s+style="[^"]*")?/, "");
       const contentLines: string[] = [];
       let depth = 3;
       let k = i;
@@ -235,7 +235,7 @@ export default function NamuViewer({
         depth += openMatches * 3;
         depth -= closeMatches * 3;
         if (depth <= 0) {
-          let contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
+          const contentToAdd = textToAnalyze.replace(/\}\}\}(?!.*\}\}\})/, "");
           if (contentToAdd.trim() || k !== i) if (contentToAdd.trim()) contentLines.push(contentToAdd);
           i = k + 1;
           foundEnd = true;

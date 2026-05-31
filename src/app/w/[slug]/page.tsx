@@ -135,7 +135,7 @@ export default async function WikiPage({ params, searchParams }: Props) {
   if (!page) {
     return (
       <div className="bg-white p-10 border border-[#ccc] rounded text-center">
-        <h1 className="text-2xl font-bold mb-6 text-gray-700">'{decodedSlug}' 문서를 찾을 수 없습니다.</h1>
+        <h1 className="text-2xl font-bold mb-6 text-gray-700">&apos;{decodedSlug}&apos; 문서를 찾을 수 없습니다.</h1>
         <div className="text-sm text-gray-500 mb-6">문서가 존재하지 않습니다. 직접 문서를 생성해보세요.</div>
         <Link
           href={`/edit/${encodeURIComponent(decodedSlug)}`}
@@ -278,7 +278,7 @@ export default async function WikiPage({ params, searchParams }: Props) {
         {isCategoryPage && (
           <div className="mt-8">
             <h2 className="font-bold text-2xl mb-1 text-[#373a3c] mb-6 pb-2 border-b border-[#ccc]">
-              "{categoryName}" 분류에 속하는 문서
+              &quot;{categoryName}&quot; 분류에 속하는 문서
             </h2>
             <div className="text-sm text-gray-500">전체 {categoryDocs.length}개 문서</div>
 

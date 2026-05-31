@@ -18,7 +18,7 @@ export async function proxy(request: NextRequest) {
     try {
       await jwtVerify(token, JWT_SECRET);
       isAuthenticated = true;
-    } catch (err) {
+    } catch {
       isAuthenticated = false;
     }
   }
